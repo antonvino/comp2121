@@ -1,0 +1,1 @@
+<AVRWorkspace><IOSettings><CurrentRegisters><PORTA><register register="DDRA" group="PORTA" display="1" locked="0"/></PORTA><PORTA><register register="PINA" group="PORTA" display="1" locked="0"/></PORTA><PORTA><register register="PORTA" group="PORTA" display="1" locked="0"/></PORTA></CurrentRegisters></IOSettings><part name="ATmega2560"/><Files/></AVRWorkspace>
