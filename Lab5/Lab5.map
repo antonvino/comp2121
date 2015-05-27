@@ -1,5 +1,5 @@
 
-AVRASM ver. 2.1.42  C:\Users\Ali\.ssh\COMP2121\comp2121\Lab5\Lab05B.asm Wed May 27 14:45:57 2015
+AVRASM ver. 2.1.42  C:\Users\Ali\.ssh\COMP2121\comp2121\Lab5\TimerExample.asm Wed May 27 16:50:25 2015
 
 
 EQU  SIGNATURE_000 0000001e
@@ -1359,5 +1359,20 @@ EQU  URXC3addr    0000006c
 EQU  UDRE3addr    0000006e
 EQU  UTXC3addr    00000070
 EQU  INT_VECTORS_SIZE 00000072
+EQU  MAXBRIGHTNESS 0000ffff
 DEF  temp         r16
-CSEG loop         0000000f
+DEF  BrightnessH  r18
+DEF  BrightnessL  r17
+DSEG SecondCounter 00000200
+DSEG TempCounter  00000202
+CSEG RESET        00000033
+CSEG DEFAULT      00000032
+CSEG Timer0OVF    0000003a
+CSEG main         0000007c
+CSEG newSecond    00000042
+CSEG NotSecond    0000006f
+CSEG showPattern  0000004b
+CSEG reloadPattern 00000064
+CSEG EndIF        00000073
+CSEG setCarry     0000006c
+CSEG loop         000000a1

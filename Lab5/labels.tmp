@@ -5,7 +5,7 @@
  <INCLUDE_PATH>
   <DIR>C:\Program Files (x86)\Atmel\AVR Tools\AvrAssembler2\Appnotes</DIR>
  </INCLUDE_PATH>
- <SOURCE_FILE>C:\Users\Ali\.ssh\COMP2121\comp2121\Lab5\Lab05B.asm</SOURCE_FILE>
+ <SOURCE_FILE>C:\Users\Ali\.ssh\COMP2121\comp2121\Lab5\TimerExample.asm</SOURCE_FILE>
  <INCLUDED_FILES>
   <FILE>C:\Program Files (x86)\Atmel\AVR Tools\AvrAssembler2\Appnotes\m2560def.inc</FILE>
  </INCLUDED_FILES>
@@ -19,6 +19,18 @@
   <FILE>C:\Users\Ali\.ssh\COMP2121\comp2121\Lab5\Lab5.map</FILE>
  </OUTPUT_FILES>
  <LABELS>
-  <loop><FILE>C:\Users\Ali\.ssh\COMP2121\comp2121\Lab5\Lab05B.asm</FILE><LINE>22</LINE></loop>
+  <SecondCounter><FILE>C:\Users\Ali\.ssh\COMP2121\comp2121\Lab5\TimerExample.asm</FILE><LINE>21</LINE></SecondCounter>
+  <TempCounter><FILE>C:\Users\Ali\.ssh\COMP2121\comp2121\Lab5\TimerExample.asm</FILE><LINE>23</LINE></TempCounter>
+  <RESET><FILE>C:\Users\Ali\.ssh\COMP2121\comp2121\Lab5\TimerExample.asm</FILE><LINE>37</LINE></RESET>
+  <DEFAULT><FILE>C:\Users\Ali\.ssh\COMP2121\comp2121\Lab5\TimerExample.asm</FILE><LINE>35</LINE></DEFAULT>
+  <Timer0OVF><FILE>C:\Users\Ali\.ssh\COMP2121\comp2121\Lab5\TimerExample.asm</FILE><LINE>46</LINE></Timer0OVF>
+  <main><FILE>C:\Users\Ali\.ssh\COMP2121\comp2121\Lab5\TimerExample.asm</FILE><LINE>122</LINE></main>
+  <newSecond><FILE>C:\Users\Ali\.ssh\COMP2121\comp2121\Lab5\TimerExample.asm</FILE><LINE>58</LINE></newSecond>
+  <NotSecond><FILE>C:\Users\Ali\.ssh\COMP2121\comp2121\Lab5\TimerExample.asm</FILE><LINE>106</LINE></NotSecond>
+  <showPattern><FILE>C:\Users\Ali\.ssh\COMP2121\comp2121\Lab5\TimerExample.asm</FILE><LINE>68</LINE></showPattern>
+  <reloadPattern><FILE>C:\Users\Ali\.ssh\COMP2121\comp2121\Lab5\TimerExample.asm</FILE><LINE>95</LINE></reloadPattern>
+  <EndIF><FILE>C:\Users\Ali\.ssh\COMP2121\comp2121\Lab5\TimerExample.asm</FILE><LINE>110</LINE></EndIF>
+  <setCarry><FILE>C:\Users\Ali\.ssh\COMP2121\comp2121\Lab5\TimerExample.asm</FILE><LINE>101</LINE></setCarry>
+  <loop><FILE>C:\Users\Ali\.ssh\COMP2121\comp2121\Lab5\TimerExample.asm</FILE><LINE>159</LINE></loop>
  </LABELS>
 </ASSEMBLER_INFO>
