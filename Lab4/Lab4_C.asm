@@ -92,10 +92,10 @@ RESET:
 	
 	; LCD setup
 	ser temp
-	out DDRF, temp
+	out DDRE, temp
 	out DDRA, temp
 	clr temp
-	out PORTF, temp
+	out PORTE, temp
 	out PORTA, temp
 
 	; LCD: init the settings
@@ -488,7 +488,7 @@ dispOneDigit:
 ;
 
 lcd_command:
-	out PORTF, lcd
+	out PORTE, lcd
 	rcall sleep_1ms
 	lcd_set LCD_E
 	rcall sleep_1ms
@@ -497,7 +497,7 @@ lcd_command:
 	ret
 
 lcd_data:
-	out PORTF, lcd
+	out PORTE, lcd
 	lcd_set LCD_RS
 	rcall sleep_1ms
 	lcd_set LCD_E
@@ -511,19 +511,19 @@ lcd_wait:
 	push lcd
 	clr lcd
 	out DDRF, lcd
-	out PORTF, lcd
+	out PORTE, lcd
 	lcd_set LCD_RW
 lcd_wait_loop:
 	rcall sleep_1ms
 	lcd_set LCD_E
 	rcall sleep_1ms
-	in lcd, PINF
+	in lcd, PINE
 	lcd_clr LCD_E
 	sbrc lcd, 7
 	rjmp lcd_wait_loop
 	lcd_clr LCD_RW
 	ser lcd
-	out DDRF, lcd
+	out DDRE, lcd
 	pop lcd
 	ret
 

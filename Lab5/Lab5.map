@@ -1,5 +1,5 @@
 
-AVRASM ver. 2.1.42  C:\Users\mrbladers\Documents\Lab5\Lab5.asm Mon May 18 10:50:42 2015
+AVRASM ver. 2.1.42  C:\Users\mrbladers\Documents\COMP2121\comp2121\Lab5\LCD_example.asm Wed May 27 14:24:05 2015
 
 
 EQU  SIGNATURE_000 0000001e
@@ -1359,25 +1359,18 @@ EQU  URXC3addr    0000006c
 EQU  UDRE3addr    0000006e
 EQU  UTXC3addr    00000070
 EQU  INT_VECTORS_SIZE 00000072
-DEF  temp1        r18
-DEF  temp2        r19
-DEF  temp         r17
-DEF  lcd          r16
+CSEG RESET        00000002
+CSEG lcd_command  00000036
+CSEG lcd_wait     00000046
+CSEG sleep_5ms    00000060
+CSEG sleep_1ms    00000057
+CSEG lcd_data     0000003d
+CSEG halt         00000035
 EQU  LCD_RS       00000007
 EQU  LCD_E        00000006
 EQU  LCD_RW       00000005
 EQU  LCD_BE       00000004
-CSEG RESET        0000000b
-CSEG DEFAULT      0000000a
-CSEG EXT_INT2     0000004b
-CSEG lcd_command  00000055
-CSEG lcd_wait     00000065
-CSEG sleep_5ms    0000007f
-CSEG sleep_1ms    00000076
-CSEG lcd_data     0000005c
-CSEG main         00000049
-CSEG halt         0000004a
-CSEG lcd_wait_loop 0000006a
+CSEG lcd_wait_loop 0000004b
 EQU  F_CPU        00f42400
 EQU  DELAY_1MS    00000f9c
-CSEG delayloop_1ms 0000007a
+CSEG delayloop_1ms 0000005b
