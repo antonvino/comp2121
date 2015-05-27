@@ -2,3 +2,4 @@
 *.bat
 *.tmp
 *.obj
+*.aws
