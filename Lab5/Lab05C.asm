@@ -5,10 +5,13 @@
 .def temp = r16
 .def temp1 = r18 
 .def temp2 = r19
-.def counter = r17
+.def measured_speed = r17	; measured speed from the opto-interrupter
 .def lcd = r20				; lcd handle
 .def digit = r21			; used to display decimal numbers digit by digit
 .def digitCount = r22		; how many digits do we have to display?
+.def target_speed = r23		; what speed we're aiming for
+.def debounceFlag0 = r26	; button 1 debounce
+.def debounceFlag1 = r27	; button 2 debounce
 
 ; The macro clears a word (2 bytes) in a memory
 ; the parameter @0 is the memory address for that word
@@ -23,11 +26,10 @@
 .dseg
 Timer1Counter:
    .byte 2              ; Temporary counter. Used to determine 
-                        ; if one second has passed
-;Timer3Counter:
-;	.byte 2
-VoltageFlag:
-	.byte 1
+                        ; if 1/4 second has passed
+DebounceCounter:
+    .byte 2              ; Debounce counter. Used to determine 
+                        ; if 50ms have passed
 
 ; LCD macros
 .macro do_lcd_command
@@ -53,13 +55,47 @@ VoltageFlag:
 	rcall convert_digits	; call a function
 .endmacro
 
+.macro do_lcd_speed
+	do_lcd_command 0b00000001 ; clear display
+	do_lcd_command 0b00000110 ; increment, no display shift
+	do_lcd_command 0b00001110 ; Cursor on, bar, no blink
+
+	do_lcd_data 'T';
+	do_lcd_data 'a';
+	do_lcd_data 'r';
+	do_lcd_data 'g';
+	do_lcd_data 'e';
+	do_lcd_data 't';
+	do_lcd_data ':';
+	do_lcd_data ' ';
+	do_lcd_digits measured_speed
+
+	do_lcd_command 0b11000000	; break to the next line
+
+	do_lcd_data 'M';
+	do_lcd_data 'e';
+	do_lcd_data 'a';
+	do_lcd_data 's';
+	do_lcd_data 'u';
+	do_lcd_data 'r';
+	do_lcd_data 'e';
+	do_lcd_data 'd';
+	do_lcd_data ':';
+	do_lcd_data ' ';
+	do_lcd_digits measured_speed
+.endmacro
 
 
 .cseg
 .org 0x0000
    jmp RESET
-   jmp DEFAULT          ; No handling for IRQ0.
-   jmp DEFAULT          ; No handling for IRQ1.
+.org INT0addr
+    jmp EXT_INT0
+.org INT1addr
+	jmp EXT_IN1
+
+	jmp DEFAULT          ; No handling for IRQ0.
+	jmp DEFAULT          ; No handling for IRQ1.
 .org INT2addr
     jmp EXT_INT2
 .org OVF0addr
@@ -76,16 +112,6 @@ RESET:
     out SPL, temp
     ser temp
     out DDRC, temp ; set Port C as output
-	
-	;ldi temp, (2 << ISC20)     ; set INT2 as falling-
-	;sts MCUCSR, temp
-    ;sts EICRA, temp             ; edge triggered interrupt
-	;sts MCUCR, temp
-    ;in temp, EIMSK               ; enable INT2
-    ;ori temp, (1<<INT2)
-    ;out EIMSK, temp
-
-	sei
 
 	; LCD setup
 	ser temp
@@ -103,31 +129,8 @@ RESET:
 	do_lcd_command 0b00111000 ; 2x5x7
 	do_lcd_command 0b00111000 ; 2x5x7
 	do_lcd_command 0b00001000 ; display off?
-	do_lcd_command 0b00000001 ; clear display
-	do_lcd_command 0b00000110 ; increment, no display shift
-	do_lcd_command 0b00001110 ; Cursor on, bar, no blink
 
-	do_lcd_data 'S';
-	do_lcd_data 'p';
-	do_lcd_data 'e';
-	do_lcd_data 'e';
-	do_lcd_data 'd';
-	do_lcd_data ':';
-	do_lcd_data ' ';
-
-	;do_lcd_digits accumulator	; display the accumulator data every time
-	;do_lcd_data ' ';
-	;do_lcd_data ' ';
-	;do_lcd_data ' ';
-	;do_lcd_data ' ';
-	;do_lcd_data ' ';
-	;do_lcd_data ' ';
-	;do_lcd_data ' ';
-	;do_lcd_data ' ';
-	;do_lcd_data ' ';
-	;do_lcd_command 0b11000000	; break to the next line
-	;do_lcd_digits currentNumber	; output current number
-
+	do_lcd_speed
 	rjmp main
 
 .equ LCD_RS = 7
@@ -142,56 +145,44 @@ RESET:
 	cbi PORTA, @0
 .endmacro
 
-
-
-EXT_INT2:
-	in temp, SREG
-	push temp
-	push temp2
-
-	;lds temp2, VoltageFlag
-	;cpi temp2, 1
-	;breq END_INT2
-
-	inc counter
-	
-	;do_lcd_command 0b00000001 ; clear display
-	;do_lcd_command 0b00000110 ; increment, no display shift
-	;do_lcd_command 0b00001110 ; Cursor on, bar, no blink
-
-	;do_lcd_data 'S';
-	;do_lcd_data 'p';
-	;do_lcd_data 'e';
-	;do_lcd_data 'e';
-	;do_lcd_data 'd';
-	;do_lcd_data ':';
-	;do_lcd_data ' ';
-	;do_lcd_digits counter
-
-	;out PORTC, counter
-
-	;ldi temp2, 1
-	;sts VoltageFlag, temp2
-
-	END_INT2:
-		pop temp2
-		pop temp
-		out SREG, temp
-		reti
-
 Timer0OVF: ; interrupt subroutine to Timer0
     in temp, SREG
     push temp       ; Prologue starts.
     push YH         ; Save all conflict registers in the prologue.
     push YL
+	push r27
+	push r26
     push r25
     push r24
-;	push counter
-	        ; Prologue ends.
-                    ; Load the value of the temporary counter.
+	; Prologue ends.
+
+	; first counter - 50ms debounce counter
+	checkFlagSet:				; if either flag is set - run the debounce timer
+		cpi debounceFlag0, 1
+		breq newFifty
+		cpi debounceFlag1, 1
+		breq newFifty
+		; otherwise - don't need the debounce timer
+		rjmp newSecond ; go to second counter
+
+	newFifty:			;	if flag is set continue counting until 50 milliseconds
+		lds r26, DebounceCounter
+    	lds r27, DebounceCounter+1
+    	adiw r27:r26, 1 ; Increase the temporary counter by one.
+
+    	cpi r26, low(780)      ; Check if (r25:r24) = 390 ; 7812 = 10^6/128/20 ; 50 milliseconds
+    	ldi temp, high(780)    ; 390 = 10^6/128/20 
+    	cpc temp, r27
+    	brne notFifty			; 50 milliseconds have not passed
+
+		clr debounceFlag0 		;	once 50 milliseconds have passed, set the debounceFlag to 0
+		clr debounceFlag1 		;	once 50 milliseconds have passed, set the debounceFlag to 0
+	   	clear DebounceCounter	; Reset the debounce counter.
+		clr r26
+		clr r27	; Reset the debounce counter.
 
 	newSecond:
-	    lds r24, Timer1Counter
+	    lds r24, Timer1Counter ; Load the value of the temporary counter.
     	lds r25, Timer1Counter+1
     	adiw r25:r24, 1 ; Increase the temporary counter by one.
 
@@ -201,22 +192,8 @@ Timer0OVF: ; interrupt subroutine to Timer0
     	brne NotSecond
 		
 		secondPassed: ; 1/4 of a second passed
-			do_lcd_command 0b00000001 ; clear display
-			do_lcd_command 0b00000110 ; increment, no display shift
-			do_lcd_command 0b00001110 ; Cursor on, bar, no blink
-
-			do_lcd_data 'S';
-			do_lcd_data 'p';
-			do_lcd_data 'e';
-			do_lcd_data 'e';
-			do_lcd_data 'd';
-			do_lcd_data ':';
-			do_lcd_data ' ';
-
-			out PORTC, counter
-
-			do_lcd_digits counter
-			clr counter
+			do_lcd_speed 		; show current speed
+			clr measured_speed
 			clear Timer1Counter
 
     rjmp EndIF
@@ -224,86 +201,129 @@ Timer0OVF: ; interrupt subroutine to Timer0
 NotSecond: ; Store the new value of the temporary counter.
     sts Timer1Counter, r24
     sts Timer1Counter+1, r25 
+	rjmp EndIF 
+
+notFifty: 	; Store the new value of the debounce counter.
+	sts DebounceCounter, r26
+	sts DebounceCounter+1, r27
+	rjmp EndIF
 
     
 EndIF:
-	;pop counter
 	pop r24         ; Epilogue starts;
     pop r25         ; Restore all conflict registers from the stack.
+	pop r26         
+    pop r27         
     pop YL
     pop YH
     pop temp
     out SREG, temp
     reti            ; Return from the interrupt.
 
-;Timer3OVF: ; interrupt subroutine to Timer3
-;	in temp, SREG
-;	push temp
-;	push r26
-;	push r27
+; subroutine for push button 0
+EXT_INT0:
+    in temp, SREG	; Prologue starts.
+    push temp       ; Save all conflict registers in the prologue.
+	       			; Prologue ends.
+                    ; Load the value of the temporary counter.
 
-	;lds temp, VoltageFlag	; if motor debounce is not set
-	;cpi temp, 1			; don't even bother
-	;brne EndTimer3
+	; debounce check
+	cpi debounceFlag0, 1		; if the button is still debouncing, ignore the interrupt
+	breq END_INT0	
 
-;	lds r26, Timer3Counter	; increase temp counter
-;	lds r27, Timer3Counter+1
-;	adiw r27:r26, 1
-		 
-;    cpi r26, low(5)			; check if the debounce time is over
-;    ldi temp, high(5)
-;    cpc r27, temp
-;    brne NotYet
+	ldi debounceFlag0, 1		; set the debounce flag
 
-;	ldi temp, 0b00000000 	; debug LED
-;	out PORTC, temp
+	ldi temp, 20
+	add target_speed, temp		; increase the speed
+	sts OCR3BH, target_speed	; set the speed
 
-;	clear Timer3Counter
-;	ldi temp, 0				; clear the debounce flag for motor interrupt
-;	sts VoltageFlag, temp
+	rjmp END_INT0
 
-;NotYet: 					; Store the new value of the temporary counter.
-;    sts Timer3Counter, r26
-;    sts Timer3Counter+1, r27 
+; Epilogue of push button 0
+END_INT0:
+    pop temp
+    out SREG, temp
+    reti            ; Return from the interrupt.
+	
+; subroutine for push button 1
+EXT_INT1:
+    in temp, SREG	; Prologue starts.
+    push temp       ; Save all conflict registers in the prologue.
+	       			; Prologue ends.
+                    ; Load the value of the temporary counter.
 
+	; debounce check
+	cpi debounceFlag1, 1		; if the button is still debouncing, ignore the interrupt
+	breq END_INT1	
 
-;EndTimer3:
-;	pop r27
-;	pop r26
-;	pop temp
-;	out SREG, temp
-;	reti
+	ldi debounceFlag1, 1		; set the debounce flag
+
+	subi target_speed, 20		; increase the speed
+	sts OCR3BH, target_speed	; set the speed
+
+	rjmp END_INT1
+
+; Epilogue of push button 1
+END_INT1:
+    pop temp
+    out SREG, temp
+    reti            ; Return from the interrupt.
+
+EXT_INT2: ; interrupt subrouting for opto-interrupter
+	in temp, SREG
+	push temp
+	push temp2
+
+	inc measured_speed
+	
+	END_INT2:
+		pop temp2
+		pop temp
+		out SREG, temp
+		reti
+
 
 main:
     clear Timer1Counter       ; Initialize the temporary counter to 0
-	;clear Timer3Counter
-	ldi r26, 0
-	sts VoltageFlag, r26	
 
-	ldi temp, (2 << ISC20)      ; set INT0 as falling-
+	; INT0 (PB1) init
+	ldi temp, (2 << ISC00)      ; set INT0 as falling-
+    sts EICRA, temp             ; edge triggered interrupt
+    in temp, EIMSK              ; enable INT0
+    ori temp, (1<<INT0)
+    out EIMSK, temp
+
+	; INT1 (PB2) init
+	ldi temp, (2 << ISC10)      ; set INT1 as falling-
+    sts EICRA, temp             ; edge triggered interrupt
+    in temp, EIMSK              ; enable INT1
+    ori temp, (1<<INT1)
+    out EIMSK, temp
+
+	; INT2 (opto-interrupter) init
+	ldi temp, (2 << ISC20)      ; set INT2 as falling-
     sts EICRA, temp             ; edge triggered interrupt
     in temp, EIMSK              ; enable INT2
     ori temp, (1<<INT2)
     out EIMSK, temp
 
-	; INT2 setup
-	;ldi temp, 0b11100000 ; clear interrupt flags
-	;out GIFR, temp
-
-	;ldi temp, 0b00100000 ; enable INT2
-	;out GICR, temp
-
-	;ldi temp, 0b00000000 ; configure INT2 to occur on falling edge
-	;out MCUCSR, temp
-
 	; Timer0 initilaisation
-
     ldi temp, 0b00000000
     out TCCR0A, temp
     ldi temp, 0b00000010
     out TCCR0B, temp        ; Prescaling value=8
     ldi temp, 1<<TOIE0      ; = 128 microseconds
     sts TIMSK0, temp        ; T/C0 interrupt enable
+
+	; PWM Configuration
+	; Configure bit PE2 as output
+	ldi temp, 0b00010000
+	ser temp
+	out DDRE, temp ; Bit 3 will function as OC3B
+	ldi temp, 0xFF ; the value controls the PWM duty cycle (store the value in the OCR registers)
+	sts OCR3BL, temp
+	clr temp
+	sts OCR3BH, temp
 
 	; Timer3 initialisation
 	;ldi temp, 0b00001000
@@ -321,7 +341,6 @@ main:
 	
 	;ldi temp, 1<<TOIE3	
     ;sts TIMSK3, temp        ; T/C0 interrupt enable
-
 
     sei                     ; Enable global interrupt
                             ; loop forever
