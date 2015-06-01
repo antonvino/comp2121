@@ -28,8 +28,8 @@ TempCounter:
    jmp RESET
    jmp DEFAULT          ; No handling for IRQ0.
    jmp DEFAULT          ; No handling for IRQ1.
-.org OVF3addr
-   jmp Timer3OVF        ; Jump to the interrupt handler for
+.org OVF0addr
+   jmp Timer0OVF        ; Jump to the interrupt handler for
                         ; Timer0 overflow.
    jmp DEFAULT          ; default service for all other interrupts.
 DEFAULT:  reti          ; no service
@@ -43,7 +43,7 @@ RESET:
     out DDRC, temp ; set Port C as output
 	rjmp main
 
-Timer3OVF: ; interrupt subroutine to Timer0
+Timer0OVF: ; interrupt subroutine to Timer0
     in temp, SREG
     push temp       ; Prologue starts.
     push YH         ; Save all conflict registers in the prologue.
@@ -60,8 +60,8 @@ Timer3OVF: ; interrupt subroutine to Timer0
     	lds r25, TempCounter+1
     	adiw r25:r24, 1 ; Increase the temporary counter by one.
 
-    	cpi r24, low(7812)  ; Check if (r25:r24) = 7812 ; 7812 = 10^6/128
-    	ldi temp, high(7812)    ; 7812 = 10^6/128
+    	cpi r24, low(976)  ; Check if (r25:r24) = 7812 ; 7812 = 10^6/128
+    	ldi temp, high(976)    ; 7812 = 10^6/128
     	cpc r25, temp
     	brne NotSecond
 		
@@ -82,8 +82,9 @@ Timer3OVF: ; interrupt subroutine to Timer0
     		sts SecondCounter, r24
     		sts SecondCounter+1, r25
 
-			ldi r19, high(16)
-			cpi r24, low(16)			; check if 16 seconds have passed
+			ldi r20, low(8)
+			ldi r19, high(8)
+			cpi r24, low(8)			; check if 16 seconds have passed
 			cpc r25, r19
 			brne newSecond
 
@@ -98,7 +99,7 @@ reloadPattern:
 	rjmp newSecond
 
 setCarry:
-	ldi r20, 0b00000001
+	ldi r20, 0b10000000
 	or BrightnessH, r20
 	rjmp showPattern
 
@@ -128,26 +129,17 @@ main:
     clear TempCounter       ; Initialize the temporary counter to 0
     clear SecondCounter     ; Initialize the second counter to 0
 
-    ; Timer3 initialisation
-	ldi temp, 0b00001000
-	sts DDRL, temp
-	
-	ldi temp, 0x4A
-	sts OCR3AL, temp
-	clr temp
-	sts OCR3AH, temp
-
-	ldi temp, (1<<CS50)
-	sts TCCR3B, temp
-	ldi temp, (1<<WGM30)|(1<<COM3A1)
-	sts TCCR3A, temp
-	
-	ldi temp, 1<<TOIE3	
-    sts TIMSK3, temp        ; T/C3 interrupt enable
+    ldi temp, 0b00000000
+    out TCCR0A, temp
+    ldi temp, 0b00000010
+    out TCCR0B, temp        ; Prescaling value=8
+    ldi temp, 1<<TOIE0      ; = 128 microseconds
+    sts TIMSK0, temp        ; T/C0 interrupt enable
+    sei                     ; Enable global interrupt
+                            ; loop forever
    	
 	; PWM Configuration
-
-	; Configure bit PE2 as output
+	// Configure bit PE2 as output
 	ldi temp, 0b00010000
 	ser temp
 	out DDRE, temp ; Bit 3 will function as OC3B
@@ -159,12 +151,9 @@ main:
 	ldi temp, (1 << CS00) ; no prescaling
 	sts TCCR3B, temp
 
-
-	; PWM phase correct 8-bit mode (WGM30)
-	; Clear when up counting, set when down-counting
+	// PWM phase correct 8-bit mode (WGM30)
+	// Clear when up counting, set when down-counting
 	ldi temp, (1<< WGM30)|(1<<COM3B1)
 	sts TCCR3A, temp
-
-	sei
    
     loop: rjmp loop
