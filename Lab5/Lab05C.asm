@@ -92,12 +92,13 @@ DebounceCounter:
 .org INT0addr
     jmp EXT_INT0
 .org INT1addr
-	jmp EXT_IN1
-
-	jmp DEFAULT          ; No handling for IRQ0.
-	jmp DEFAULT          ; No handling for IRQ1.
+	jmp EXT_INT1
 .org INT2addr
     jmp EXT_INT2
+	jmp DEFAULT          ; No handling for IRQ1.
+	jmp DEFAULT          ; No handling for IRQ1.
+
+
 .org OVF0addr
    jmp Timer0OVF        ; Jump to the interrupt handler for
 ;.org OVF3addr
