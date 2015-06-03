@@ -25,10 +25,20 @@
     st Y+, temp         ; clear the two bytes at @0 in SRAM
     st Y, temp
 .endmacro
+
+; The macro clears a byte (1 byte) in a memory
+; the parameter @0 is the memory address for that byte
+.macro clear_byte
+    ldi YL, high(@0)     		; load the memory address to Y
+    clr temp 
+    st Y, temp         ; clear the byte at @0 in SRAM
+.endmacro
                         
 .dseg
 TempCounter:
     .byte 2             ; Temporary counter. Counts milliseconds
+DisplayCounter:			; Used to call display_data every 100ms
+    .byte 1
 DebounceCounter:		; Debounce counter. Used to determine
     .byte 2             ; if 100ms have passed
 MicrowaveCounter:
@@ -174,7 +184,7 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		cpi debounceFlag, 1
 		breq newDebounce		; i.e. set to 1
 		; otherwise - don't need the debounce timer
-		rjmp microwaveRunning ; go to the microwave timer
+		rjmp endDebounce 		; end of Debouncing
 
 	newDebounce:	;	if flag is set continue counting until 100 milliseconds
 		;ldi temp, 0b11000011
@@ -192,6 +202,15 @@ Timer0OVF: ; interrupt subroutine to Timer0
 	   	clear DebounceCounter	; Reset the debounce counter.
 		clr r26
 		clr r27	; Reset the debounce counter.
+	endDebounce:	
+
+	displayData:	; display the data every 100ms
+		lds temp, DisplayCounter
+		cpi temp, low(100)	; already 100ms?
+		brne delayDisplay
+		clear_byte DisplayCounter
+		rcall display_data
+	endDisplayData:			; return here after displaying
 
 	microwaveRunning:
 		lds temp, Mode
@@ -213,7 +232,7 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		clr r27	
 		; decrement timer by one second
 
-		do_lcd_data 'T'
+		;do_lcd_data 'T'
 
 		decrementTimer:
 		lds temp, Seconds
@@ -242,7 +261,6 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		sts Seconds, temp
 		rjmp endDecrement
 
-
 	endDecrement:
 
     rjmp EndIF
@@ -252,7 +270,13 @@ Timer0OVF: ; interrupt subroutine to Timer0
 notHundred: 		; Store the new value of the debounce counter.
 	sts DebounceCounter, r26
 	sts DebounceCounter+1, r27
-	rjmp microwaveRunning
+	rjmp endDebounce
+
+delayDisplay:		; increase the display counter data
+	lds temp, DisplayCounter
+	inc temp
+	sts DisplayCounter, temp
+	rjmp endDisplayData
 
 notOneSecond:
 	sts MicrowaveCounter, r26
@@ -432,32 +456,7 @@ star:
 convert_end:
 	do_lcd_command 0b00000001 ; clear display
 	
-	;lds YL, EnteredDigits
-	;do_lcd_digits YL :
-	lds YL, DisplayDigits
-	do_lcd_digits YL
-	lds YL, DisplayDigits+1
-	do_lcd_digits YL
-	do_lcd_data ':'
-	lds YL, DisplayDigits+2
-	do_lcd_digits YL
-	lds YL, DisplayDigits+3
-	do_lcd_digits YL
-;	lds YL, Running
-;	do_lcd_digits YL
-
-	do_lcd_data ' '
-	lds temp, Minutes
-	do_lcd_digits temp
-	do_lcd_data ':'
-	lds temp, Seconds
-	do_lcd_digits temp
-
-NextLine:
-	;do_lcd_data ' ';
-	;do_lcd_data ' ';
-	;do_lcd_data ' ';
-	do_lcd_command 0b11000000	; break to the next line
+	;rcall display_time
 
 DoorStatus:
 	lds YL, DoorState
@@ -633,4 +632,49 @@ sleep_5ms:
 	rcall sleep_1ms
 	rcall sleep_1ms
 	rcall sleep_1ms
+	ret
+
+;
+; Display the data
+;
+display_data:
+	do_lcd_command 0b00000001 ; clear display
+	do_lcd_command 0b00000110 ; increment, no display shift
+	do_lcd_command 0b00001110 ; Cursor on, bar, no blink
+
+	rcall display_time
+	; TODO: move cursor to the turntable spot
+	;rcall display_turntable
+	ret
+
+display_time:
+	push temp
+	;lds YL, EnteredDigits
+	;do_lcd_digits YL :
+	lds YL, DisplayDigits
+	do_lcd_digits YL
+	lds YL, DisplayDigits+1
+	do_lcd_digits YL
+	do_lcd_data ':'
+	lds YL, DisplayDigits+2
+	do_lcd_digits YL
+	lds YL, DisplayDigits+3
+	do_lcd_digits YL
+;	lds YL, Running
+;	do_lcd_digits YL
+
+	do_lcd_data ' '
+	lds temp, Minutes
+	do_lcd_digits temp
+	do_lcd_data ':'
+	lds temp, Seconds
+	do_lcd_digits temp
+
+	NextLine:
+	;do_lcd_data ' ';
+	;do_lcd_data ' ';
+	;do_lcd_data ' ';
+	do_lcd_command 0b11000000	; break to the next line
+
+	pop temp
 	ret
