@@ -1,4 +1,5 @@
 .include "m2560def.inc"
+.include "DigitDisplay.asm"
 
 .def row = r16              ; current row number
 .def col = r17              ; current column number
@@ -8,9 +9,9 @@
 .def temp2 = r21
 .def temp = r22
 .def lcd = r23
-.def digit = r24			; used to display decimal numbers digit by digit
-.def debounceFlag = r25		; the debounce flag
-.def digitCount = r26		; how many digits do we have to display?
+.def digit = r27			; used to display decimal numbers digit by digit
+.def debounceFlag = r30		; the debounce flag
+.def digitCount = r31		; how many digits do we have to display?
 .equ PORTLDIR = 0xF0        ; PH7-4: output, PH3-0, input
 .equ INITCOLMASK = 0xEF     ; scan from the rightmost column,
 .equ INITROWMASK = 0x01     ; scan from the top row
@@ -31,12 +32,21 @@ TempCounter:
     .byte 2             ; Temporary counter. Counts milliseconds
 DebounceCounter:		; Debounce counter. Used to determine
     .byte 2             ; if 100ms have passed
-CountdownTimer:
-	.byte 4	 
-FilledDigits:
+DisplayDigits:
+	.byte 4
+EnteredDigits:
 	.byte 1
-DigitCounter:
-	.byte 1	                       
+
+; digit entering macro
+.macro shift_left_once
+	lds YL, @0+1
+	sts @0, YL
+	lds YL, @0+2
+	sts @0+1, YL
+	lds YL, @0+3
+	sts @0+2, YL
+.endmacro
+	                        
 
 ; LCD macros
 .macro do_lcd_command
@@ -110,6 +120,19 @@ RESET:
 	do_lcd_command 0b00000110 ; increment, no display shift
 	do_lcd_command 0b00001110 ; Cursor on, bar, no blink
 
+	;do_lcd_command 0b00000001 ; clear display
+
+	;do_lcd_data ' ';
+	;do_lcd_data ' ';
+	;do_lcd_data ' ';
+	;do_lcd_data ' ';
+	;do_lcd_data ' ';
+	;do_lcd_data ' ';
+	;do_lcd_data ' ';
+	;do_lcd_data ' ';
+	;do_lcd_data ' ';
+	do_lcd_command 0b11000000	; break to the next line
+
     rjmp main         	; restart the main loop
 
 halt:
@@ -151,8 +174,8 @@ Timer0OVF: ; interrupt subroutine to Timer0
     	lds r27, DebounceCounter+1
     	adiw r27:r26, 1 ; Increase the temporary counter by one.
 
-    	cpi r26, low(100)      ; Check if (r25:r24) = 390 ; 7812 = 10^6/128/20 ; 50 milliseconds
-    	ldi temp, high(100)    ; 390 = 10^6/128/20 
+    	cpi r26, low(50)      ; Check if (r25:r24) = 390 ; 7812 = 10^6/128/20 ; 50 milliseconds
+    	ldi temp, high(50)    ; 390 = 10^6/128/20 
     	cpc temp, r27
     	brne notHundred			; 100 milliseconds have not passed
 
@@ -259,10 +282,10 @@ convert:
 	;out PORTC, row
 	
     cpi col, 3              ; If the pressed key is in col 3
-    breq letters            ; we have letter
+    breq convert_end 		; we have letter
                             ; If the key is not in col 3 and
     cpi row, 3              ; if the key is in row 3,
-    breq symbols            ; we have a symbol or 0
+    breq convert_end        ; we have a symbol or 0
 
     mov temp1, row          ; otherwise we have a number 1-9
     lsl temp1
@@ -271,62 +294,38 @@ convert:
 	subi temp1, -1			; add the value of binary 1
 							; i.e. 0,0 will be 1
 
-; TODO: Add the number to our list of display digits
-	ldi YL, low(FilledDigits)     ; load the memory address to Y
-	cpi YL, 4
-	brlt alreadyFilled
+; TODO: do digit entry stuff here
+	lds YL, EnteredDigits
+	inc YL
+	sts EnteredDigits, YL
+	cpi YL, 5
+	brge store
 
-alreadyFilled:
-	
-	
+	shift_left_once DisplayDigits
+	sts DisplayDigits+3, temp1	
 
+store:
     rjmp convert_end
     
-letters:
-    ;ldi temp1, 'A'
-    ;add temp1, row          ; Get the ASCII value for the key
-
-	cpi row, 1
-	breq letterB
-	cpi row, 2
-	breq letterC
-	cpi row, 3
-	breq letterD
-	
-    rjmp letterA
-
-letterA:
-	rjmp doOperation
-letterB:
-	rjmp doOperation
-letterC:
-	rjmp doOperation
-letterD:
-	rjmp doOperation
-
-doOperation:
-	rjmp convert_end
-
-symbols:
-    cpi col, 0              ; Check if we have a star
-    breq star
-    cpi col, 1              ; or if we have zero
-    breq zero
-    ;ldi temp1, '#'         ; if not we have hash
-	;clr temp1				; TEMP: not handling the hash now
-    rjmp initKeypad
-star:
-    rjmp convert_end
-zero:
-	rjmp convert_end
-
 convert_end:
 	do_lcd_command 0b00000001 ; clear display
+	
+	;lds YL, EnteredDigits
+	;do_lcd_digits YL :
+	lds YL, DisplayDigits
+	do_lcd_digits YL
+	lds YL, DisplayDigits+1
+	do_lcd_digits YL
+	do_lcd_data ':'
+	lds YL, DisplayDigits+2
+	do_lcd_digits YL
+	lds YL, DisplayDigits+3
+	do_lcd_digits YL
 
-
 	;do_lcd_data ' ';
 	;do_lcd_data ' ';
 	;do_lcd_data ' ';
+	do_lcd_command 0b11000000	; break to the next line
 
 	ldi digit, 1				; use digit as flag - key is pressed but not released yet
     rjmp initKeypad         	; restart the main loop
@@ -490,3 +489,5 @@ sleep_5ms:
 	rcall sleep_1ms
 	rcall sleep_1ms
 	ret
+
+; Div8 divides a 8-bit-number by a 8-bit-number
