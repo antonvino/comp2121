@@ -14,23 +14,7 @@
 .equ INITROWMASK = 0x01     ; scan from the top row
 .equ ROWMASK = 0x0F         ; for obtaining input from Port L
 
-; The macro clears a word (2 bytes) in a memory
-; the parameter @0 is the memory address for that word
-.macro clear
-    ldi YL, low(@0)     ; load the memory address to Y
-    ldi YH, high(@0)
-    clr temp 
-    st Y+, temp         ; clear the two bytes at @0 in SRAM
-    st Y, temp
-.endmacro
-
-; The macro clears a byte (1 byte) in a memory
-; the parameter @0 is the memory address for that byte
-.macro clear_byte
-    ldi YL, high(@0)     		; load the memory address to Y
-    clr temp 
-    st Y, temp         ; clear the byte at @0 in SRAM
-.endmacro
+.include "macros.asm"
                         
 .dseg
 TempCounter:
@@ -43,25 +27,6 @@ TurntableDirection:		; stores the turntable direction flag 0 CW / 1 CCW
 	.byte 1
 DoorState:				; stores the state of door (closed 0, opened 1)
 	.byte 1
-
-
-; LCD macros
-.macro do_lcd_command
-	ldi lcd, @0
-	rcall lcd_command
-	rcall lcd_wait
-.endmacro
-.macro do_lcd_data
-	ldi lcd, @0
-	rcall lcd_data
-	rcall lcd_wait
-.endmacro
-.macro do_lcd_rdata
-	mov lcd, @0
-	subi lcd, -'0'
-	rcall lcd_data
-	rcall lcd_wait
-.endmacro
 
 ; Interrupts handling
 .cseg
@@ -275,74 +240,4 @@ display_turntable_dash:
 	do_lcd_data '-'
 	ret
 
-;
-; Send a command to the LCD (lcd register)
-;
-
-lcd_command:
-	out PORTF, lcd
-	rcall sleep_1ms
-	lcd_set LCD_E
-	rcall sleep_1ms
-	lcd_clr LCD_E
-	rcall sleep_1ms
-	ret
-
-lcd_data:
-	out PORTF, lcd
-	lcd_set LCD_RS
-	rcall sleep_1ms
-	lcd_set LCD_E
-	rcall sleep_1ms
-	lcd_clr LCD_E
-	rcall sleep_1ms
-	lcd_clr LCD_RS
-	ret
-
-lcd_wait:
-	push lcd
-	clr lcd
-	out DDRF, lcd
-	out PORTF, lcd
-	lcd_set LCD_RW
-lcd_wait_loop:
-	rcall sleep_1ms
-	lcd_set LCD_E
-	rcall sleep_1ms
-	in lcd, PINF
-	lcd_clr LCD_E
-	sbrc lcd, 7
-	rjmp lcd_wait_loop
-	lcd_clr LCD_RW
-	ser lcd
-	out DDRF, lcd
-	pop lcd
-	ret
-
-.equ F_CPU = 16000000
-.equ DELAY_1MS = F_CPU / 4 / 1000 - 4
-; 4 cycles per iteration - setup/call-return overhead
-
-sleep_1ms:
-	push r24
-	push r25
-	ldi r25, high(DELAY_1MS)
-	ldi r24, low(DELAY_1MS)
-delayloop_1ms:
-	sbiw r25:r24, 1
-	brne delayloop_1ms
-	pop r25
-	pop r24
-	ret
-
-sleep_5ms:
-	rcall sleep_1ms
-	rcall sleep_1ms
-	rcall sleep_1ms
-	rcall sleep_1ms
-	rcall sleep_1ms
-	ret
-
-build_bslash:
-	do_lcd_data 0b10100100
-ret
+.include "lcd.asm"
