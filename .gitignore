@@ -3,3 +3,5 @@
 *.tmp
 *.obj
 *.aws
+*.map
+*.hex

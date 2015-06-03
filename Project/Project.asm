@@ -1,5 +1,4 @@
 .include "m2560def.inc"
-.include "DigitDisplay.asm"
 
 .def row = r16              ; current row number
 .def col = r17              ; current column number
@@ -32,9 +31,19 @@ TempCounter:
     .byte 2             ; Temporary counter. Counts milliseconds
 DebounceCounter:		; Debounce counter. Used to determine
     .byte 2             ; if 100ms have passed
+MicrowaveCounter:
+	.byte 2
 DisplayDigits:
 	.byte 4
 EnteredDigits:
+	.byte 1
+DoorState:
+	.byte 1
+Mode:
+	.byte 1
+Minutes:
+	.byte 1
+Seconds:
 	.byte 1
 
 ; digit entering macro
@@ -165,7 +174,7 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		cpi debounceFlag, 1
 		breq newDebounce		; i.e. set to 1
 		; otherwise - don't need the debounce timer
-		rjmp EndIF ; go to the epilogue
+		rjmp microwaveRunning ; go to the microwave timer
 
 	newDebounce:	;	if flag is set continue counting until 100 milliseconds
 		;ldi temp, 0b11000011
@@ -184,6 +193,58 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		clr r26
 		clr r27	; Reset the debounce counter.
 
+	microwaveRunning:
+		lds temp, Mode
+		cpi temp, 0
+		breq ENDIF
+		
+		lds r26, MicrowaveCounter
+    	lds r27, MicrowaveCounter+1	
+		
+		adiw r27:r26, 1 ; Increase the temporary counter by one.
+
+    	cpi r26, low(7812)      ; Check if (r25:r24) = 7812, one second
+    	ldi temp, high(7812)    ; 390 = 10^6/128/20 
+    	cpc temp, r27
+    	brne notOneSecond			; 1 second hasn't passed
+	
+		clear MicrowaveCounter
+		clr r26
+		clr r27	
+		; decrement timer by one second
+
+		do_lcd_data 'T'
+
+		decrementTimer:
+		lds temp, Seconds
+		cpi temp, 0
+		breq decrementMinutes
+
+		dec temp
+		sts Seconds, temp
+		rjmp endDecrement
+	
+		decrementMinutes:
+		lds temp, Minutes
+		cpi temp, 0
+		brge continueCountdown
+
+		finishedCountdown:
+		ldi temp, 0
+		sts Mode, temp
+		rjmp endDecrement
+
+		continueCountdown:
+		dec temp
+		sts Minutes, temp
+
+		ldi temp, 59
+		sts Seconds, temp
+		rjmp endDecrement
+
+
+	endDecrement:
+
     rjmp EndIF
 
 ; supplementary functions
@@ -191,7 +252,12 @@ Timer0OVF: ; interrupt subroutine to Timer0
 notHundred: 		; Store the new value of the debounce counter.
 	sts DebounceCounter, r26
 	sts DebounceCounter+1, r27
-	rjmp EndIF
+	rjmp microwaveRunning
+
+notOneSecond:
+	sts MicrowaveCounter, r26
+	sts MicrowaveCounter+1, r27
+	rjmp EndIF	
 	    
 EndIF:
     pop r26         ; Epilogue starts;
@@ -201,7 +267,6 @@ EndIF:
     pop temp
     out SREG, temp
     reti            ; Return from the interrupt.
-
 
 main:
 	clear DebounceCounter       ; Initialize the temporary counter to 0
@@ -282,10 +347,11 @@ convert:
 	;out PORTC, row
 	
     cpi col, 3              ; If the pressed key is in col 3
-    breq convert_end 		; we have letter
+    breq letters	 		; we have letter
                             ; If the key is not in col 3 and
+	notLetter:
     cpi row, 3              ; if the key is in row 3,
-    breq convert_end        ; we have a symbol or 0
+    breq symbols  			; we have a symbol or 0
 
     mov temp1, row          ; otherwise we have a number 1-9
     lsl temp1
@@ -295,17 +361,73 @@ convert:
 							; i.e. 0,0 will be 1
 
 ; TODO: do digit entry stuff here
+digitDisplay:
 	lds YL, EnteredDigits
 	inc YL
 	sts EnteredDigits, YL
 	cpi YL, 5
-	brge store
+	brge convert_end
 
 	shift_left_once DisplayDigits
 	sts DisplayDigits+3, temp1	
+	rjmp convert_end
 
-store:
-    rjmp convert_end
+letters:
+	cpi row, 0
+	breq letterA
+	cpi row, 1
+	breq letterB
+
+letterA:
+	rjmp convert_end
+
+letterB:
+	rjmp convert_end
+
+	rjmp convert_end
+
+symbols:
+    cpi col, 0              ; Check if we have a star
+    breq star
+    cpi col, 1              ; or if we have zero
+    breq zero
+    ;ldi temp1, '#'         ; if not we have hash
+	;clr temp1				; TEMP: not handling the hash now
+    rjmp initKeypad
+
+zero:
+	ldi temp1, 0
+	rjmp digitDisplay
+
+star:
+	lds temp, Mode
+	cpi temp, 0
+	breq startMicrowave
+
+	addMinute:
+	lds temp, Minutes
+	inc temp
+	sts Minutes, temp
+	rjmp convert_end
+
+	startMicrowave:
+	ldi temp, 1
+	sts Mode, temp
+ 	lds temp1, DisplayDigits+2
+ 	ldi temp, 10
+ 	mul temp, temp1
+ 	lds temp1, DisplayDigits+3
+ 	add temp1, r0
+ 	sts Seconds, temp1
+
+	lds temp1, DisplayDigits
+	ldi temp, 10
+  	mul temp, temp1
+  	lds temp1, DisplayDigits+1
+  	add temp1, r0
+  	sts Minutes, temp1
+ 
+ 	rjmp convert_end
     
 convert_end:
 	do_lcd_command 0b00000001 ; clear display
@@ -321,12 +443,35 @@ convert_end:
 	do_lcd_digits YL
 	lds YL, DisplayDigits+3
 	do_lcd_digits YL
+;	lds YL, Running
+;	do_lcd_digits YL
 
+	do_lcd_data ' '
+	lds temp, Minutes
+	do_lcd_digits temp
+	do_lcd_data ':'
+	lds temp, Seconds
+	do_lcd_digits temp
+
+NextLine:
 	;do_lcd_data ' ';
 	;do_lcd_data ' ';
 	;do_lcd_data ' ';
 	do_lcd_command 0b11000000	; break to the next line
 
+DoorStatus:
+	lds YL, DoorState
+	cpi YL, 0
+	breq DoorOpen
+
+DoorOpen:
+	do_lcd_data 'O'
+	rjmp Finish
+
+DoorClosed:
+	do_lcd_data 'C'
+
+Finish:
 	ldi digit, 1				; use digit as flag - key is pressed but not released yet
     rjmp initKeypad         	; restart the main loop
 
@@ -489,5 +634,3 @@ sleep_5ms:
 	rcall sleep_1ms
 	rcall sleep_1ms
 	ret
-
-; Div8 divides a 8-bit-number by a 8-bit-number
