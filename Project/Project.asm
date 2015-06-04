@@ -178,68 +178,83 @@ display_data:
 	do_lcd_command 0b00000110 ; increment, no display shift
 	do_lcd_command 0b00001110 ; Cursor on, bar, no blink
 
+	; Finished mode
 	lds temp, Mode
 	cpi temp, 3
-	breq display_finished_mode
+	breq displayFinishedMode
+	rjmp endDisplayFinishedMode	
+
+	displayFinishedMode:
+		do_lcd_data 'D'
+		do_lcd_data 'o'
+		do_lcd_data 'n'
+		do_lcd_data 'e'
+		do_lcd_command 0b11000000	; break to the next line
+		do_lcd_data 'R'
+		do_lcd_data 'e'
+		do_lcd_data 'm'
+		do_lcd_data 'o'
+		do_lcd_data 'v'
+		do_lcd_data 'e'
+		do_lcd_data ' '
+		do_lcd_data 'f'
+		do_lcd_data 'o'
+		do_lcd_data 'o'
+		do_lcd_data 'd'
+		; set the cursor for the bottom right
+		do_lcd_data ' '
+		do_lcd_data ' '
+		do_lcd_data ' '
+		do_lcd_data ' '
+		rcall display_door 			; display door state
+	rjmp display_end
+	endDisplayFinishedMode:
 	
-	displayOther:
+	; Power input mode
 	lds temp, Mode
 	cpi temp, 4
-	breq PowerLevelScreen
+	breq displayPowerInputMode
+	rjmp endDisplayPowerInputMode
 
+	displayPowerInputMode:
+		do_lcd_data 'S'
+		do_lcd_data 'e'
+		do_lcd_data 't'
+		do_lcd_data ' '
+		do_lcd_data 'P'
+		do_lcd_data 'o'
+		do_lcd_data 'w'
+		do_lcd_data 'e'
+		do_lcd_data 'r'
+		do_lcd_data ' '
+		do_lcd_data '1'
+		do_lcd_data '/'
+		do_lcd_data '2'
+		do_lcd_data '/'
+		do_lcd_data '3'
+		rcall cursor_bottom_right
+		rcall display_door
+	rjmp display_end		
+	endDisplayPowerInputMode:
+
+	; Microwave timer display - running mode or pause mode
 	rcall display_time
-	; TODO: move cursor to the turntable spot
-	;rcall display_turntable
-	rjmp DoorDisplay
-	
-	PowerLevelScreen:
-	do_lcd_data 'S'
-	do_lcd_data 'e'
-	do_lcd_data 't'
-	do_lcd_data ' '
-	do_lcd_data 'P'
-	do_lcd_data 'o'
-	do_lcd_data 'w'
-	do_lcd_data 'e'
-	do_lcd_data 'r'
-	do_lcd_data ' '
-	do_lcd_data '1'
-	do_lcd_data '/'
-	do_lcd_data '2'
-	do_lcd_data '/'
-	do_lcd_data '3'
-	rjmp DoorDisplay		
-
-	display_finished_mode:
-	do_lcd_data 'D'
-	do_lcd_data 'o'
-	do_lcd_data 'n'
-	do_lcd_data 'e'
-
-	do_lcd_command 0b11000000	; break to the next line
-
-	do_lcd_data 'R'
-	do_lcd_data 'e'
-	do_lcd_data 'm'
-	do_lcd_data 'o'
-	do_lcd_data 'v'
-	do_lcd_data 'e'
-	do_lcd_data ' '
-	do_lcd_data 'f'
-	do_lcd_data 'o'
-	do_lcd_data 'o'
-	do_lcd_data 'd'
-	rjmp DoorDisplay
-
-	DoorDisplay:
+	; move cursor to the top right
 	do_lcd_data ' '
 	do_lcd_data ' '
 	do_lcd_data ' '
 	do_lcd_data ' '
-		
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	rcall display_turntable
+	rcall cursor_bottom_right
 	rcall display_door
 	rjmp display_end
-
+			
 	display_end:
 	ret
 
@@ -250,6 +265,9 @@ display_time:
 	cpi temp, 0
 	breq display_input				; if in entry mode display input
 	rjmp display_countdown			; otherwise display current time
+	endDisplayTime:
+	pop temp
+	ret
 
 display_input:
 	;lds YL, EnteredDigits
@@ -264,7 +282,7 @@ display_input:
 	do_lcd_rdata YL
 	lds YL, DisplayDigits+3
 	do_lcd_rdata YL
-	rjmp display_Turntable
+	rjmp endDisplayTime
 
 display_countdown:
 	lds temp, Minutes
@@ -272,23 +290,11 @@ display_countdown:
 	do_lcd_data ':'
 	lds temp, Seconds
 	do_lcd_digits temp
+	rjmp endDisplayTime
 
-	rjmp display_Turntable
-
-display_Turntable:
-	do_lcd_data ' '
-	do_lcd_data ' '
-	do_lcd_data ' '
-	do_lcd_data ' '
-	do_lcd_data ' '
-	do_lcd_data ' '
-	do_lcd_data ' '
-	do_lcd_data ' '
-	do_lcd_data ' '
-	do_lcd_data ' '
+display_turntable:
 	do_lcd_data 'T'
 	; display turntable here
-	pop temp
 	ret
 
 display_door:
@@ -308,3 +314,22 @@ display_door_opened:
 	out PORTC, temp
 	do_lcd_data 'O'			; show O at the top-right
 	rjmp end_display_door
+
+cursor_bottom_right:
+	do_lcd_command 0b11000000	; break to the next line
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	ret

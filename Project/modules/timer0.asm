@@ -186,8 +186,6 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		clr r27	
 		; decrement timer by one second
 
-		;do_lcd_data 'T'
-
 		decrementTimer:
 		lds temp, Seconds
 		cpi temp, 0
