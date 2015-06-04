@@ -56,8 +56,6 @@ DoorState:
     jmp EXT_INT0
 .org INT1addr
 	jmp EXT_INT1
-.org INT2addr
-    jmp EXT_INT2
 	jmp DEFAULT          ; No handling for IRQ1.
 	jmp DEFAULT          ; No handling for IRQ1.
 
@@ -234,20 +232,6 @@ END_INT1:
     pop temp
     out SREG, temp
     reti            ; Return from the interrupt.
-
-EXT_INT2: ; interrupt subrouting for opto-interrupter
-	in temp, SREG
-	push temp
-	push temp2
-
-	inc measured_speed
-	
-	END_INT2:
-		pop temp2
-		pop temp
-		out SREG, temp
-		reti
-
 
 main:
     clear Timer1Counter       ; Initialize the temporary counter to 0
