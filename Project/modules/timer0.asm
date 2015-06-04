@@ -133,10 +133,8 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		clr temp
 
 		lds temp, DoorState
-		cpi temp, 0
-		breq dontStopMagnetron
-		rcall stopMagnetron 		; stop the spinning immediately if door is opened
-		dontStopMagnetron:
+		cpi temp, 1
+		breq endMagnetron			; stop spinning if the door is opened
 
 		lds temp, Mode
 		cpi temp, 1
