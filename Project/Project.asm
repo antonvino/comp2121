@@ -24,10 +24,15 @@
 .def digit = r27			; used to display decimal numbers digit by digit
 .def debounceFlag = r30		; the debounce flag
 .def digitCount = r31		; how many digits do we have to display?
+
 .equ PORTLDIR = 0xF0        ; PH7-4: output, PH3-0, input
 .equ INITCOLMASK = 0xEF     ; scan from the rightmost column,
 .equ INITROWMASK = 0x01     ; scan from the top row
 .equ ROWMASK = 0x0F         ; for obtaining input from Port L
+.equ LCD_RS = 7
+.equ LCD_E = 6
+.equ LCD_RW = 5
+.equ LCD_BE = 4
 
 .include "modules/macros.asm"
 
@@ -164,19 +169,6 @@ RESET:
 	do_lcd_data ')'
 
   	rjmp main         	; restart the main loop
-
-
-.equ LCD_RS = 7
-.equ LCD_E = 6
-.equ LCD_RW = 5
-.equ LCD_BE = 4
-
-.macro lcd_set
-	sbi PORTA, @0
-.endmacro
-.macro lcd_clr
-	cbi PORTA, @0
-.endmacro
 
 .include "modules/timer0.asm"
 

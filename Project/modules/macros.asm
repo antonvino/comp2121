@@ -52,6 +52,13 @@
 	rcall lcd_wait
 .endmacro
 
+.macro lcd_set
+	sbi PORTA, @0
+.endmacro
+.macro lcd_clr
+	cbi PORTA, @0
+.endmacro
+
 ;
 ; Working with decimal numbers
 ;
