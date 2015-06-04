@@ -110,7 +110,7 @@ convert:
 	brne digitDisplay
 
 	PowerLevelSet:			; if in power entry mode
-	cpi temp1, 4			; if number is less than 4
+	cpi temp1, 4			; if number is less than 4, not valid
 	brlt PowerLevelCheck0
 	jmp convert_end
 
@@ -124,10 +124,9 @@ convert:
 	ldi temp, 0
 	sts Mode, temp
 	rjmp convert_end
-
-; TODO: do digit entry stuff here
-digitDisplay:
-	lds YL, EnteredDigits
+ 
+digitDisplay:					; shift current numbers over to make space
+	lds YL, EnteredDigits		; for input
 	inc YL
 	sts EnteredDigits, YL
 	cpi YL, 5
@@ -139,7 +138,7 @@ digitDisplay:
 	sts DisplayDigits+3, temp1	
 	rjmp convert_end
 
-letters:
+letters:					; break to the relevant branches for letters
 	cpi row, 0
 	breq letterA
 	cpi row, 2
@@ -261,15 +260,15 @@ star:
 	cpi temp, 0
 	brne digitsEntered
 	
-	noDigitsEntered:
-	ldi temp, 1
+	noDigitsEntered:			; if no digits have been entered, 
+	ldi temp, 1					; default 1 minute
 	sts Minutes, temp
 	ldi temp, 0
 	sts Seconds, temp
 	rjmp star_Set_Entry
 
-	digitsEntered:
- 	lds temp1, DisplayDigits+2
+	digitsEntered:					; if digits have been entered
+ 	lds temp1, DisplayDigits+2		; set timer variables
  	ldi temp, 10
  	mul temp, temp1
  	lds temp1, DisplayDigits+3
