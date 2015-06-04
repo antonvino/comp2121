@@ -49,12 +49,27 @@ EnteredDigits:
 	.byte 1
 DoorState:
 	.byte 1
-Mode:
+Mode:					; 0: Entry | 1: Running | 2: Pause | 3: Finished | 4: Power Level
 	.byte 1
 Minutes:
 	.byte 1
 Seconds:
 	.byte 1
+RefreshFlag:
+	.byte 1
+MoreFlag:
+	.byte 1
+LessFlag:
+	.byte 1	
+StopFlag:
+	.byte 1
+PowerLevel:
+	.byte 1
+SecondsIdle:
+	.byte 1
+FadingFlag:
+	.byte 1
+
 
 ; digit entering macro
 .macro shift_left_once
@@ -170,6 +185,7 @@ halt:
 .endmacro
 
 
+
 Timer0OVF: ; interrupt subroutine to Timer0
     in temp, SREG
     push temp       ; Prologue starts.
@@ -202,20 +218,100 @@ Timer0OVF: ; interrupt subroutine to Timer0
 	   	clear DebounceCounter	; Reset the debounce counter.
 		clr r26
 		clr r27	; Reset the debounce counter.
-	endDebounce:	
+	endDebounce:
+		rjmp microwaveRunning	
 
-	displayData:	; display the data every 100ms
-		lds temp, DisplayCounter
-		cpi temp, low(100)	; already 100ms?
-		brne delayDisplay
-		clear_byte DisplayCounter
-		rcall display_data
-	endDisplayData:			; return here after displaying
+	notHundred: 		; Store the new value of the debounce counter.
+	sts DebounceCounter, r26
+	sts DebounceCounter+1, r27
+	rjmp endDebounce
 
 	microwaveRunning:
 		lds temp, Mode
-		cpi temp, 0
-		breq ENDIF
+		cpi temp, 1
+		breq runningMode
+		jmp ENDIF
+
+		runningMode:
+		
+		CheckDoorOpen:
+		lds temp, DoorState
+		cpi temp, 1
+		brne CheckMoreOrLess
+		jmp EndIF
+				
+		CheckMoreOrLess:
+
+		checkMore:
+		lds temp, MoreFlag
+		cpi temp, 1
+		brne checkLess
+
+		More:
+			lds temp, Seconds
+			cpi temp, 30
+			brlt NoCarryMore
+
+		CarryMore:
+			lds temp, Minutes
+			inc temp
+			sts Minutes, temp
+			lds temp, Seconds
+			ldi temp1, 30
+			sub temp, temp1
+			sts Seconds, temp
+			do_lcd_data '-'
+			do_lcd_digits temp
+			rjmp EndMore
+
+		NoCarryMore:
+			ldi temp1, 30
+			add temp, temp1
+			sts Seconds, temp
+
+		EndMore:
+			ldi temp, 0
+			sts MoreFlag, temp
+
+		checkLess:
+			lds temp, LessFlag
+			cpi temp, 1
+			brne checkTimer
+
+		Less:
+			lds temp, Seconds
+			cpi temp, 30
+			brge NoCarryLess
+
+		CarryLess:
+			; check if minutes is already 0
+			lds temp, Minutes
+			cpi temp, 0
+			breq LessFinished
+			
+			dec temp
+			sts Minutes, temp
+			lds temp, Seconds
+			ldi temp1, 30
+			add temp, temp1
+			sts Seconds, temp
+			rjmp EndLess
+
+			LessFinished:
+			clr temp
+			sts Seconds, temp
+			jmp EndLess
+
+		NoCarryLess:
+			ldi temp1, 30
+			sub temp, temp1
+			sts Seconds, temp
+
+		EndLess:
+			ldi temp, 0
+			sts LessFlag, temp
+
+		checkTimer:
 		
 		lds r26, MicrowaveCounter
     	lds r27, MicrowaveCounter+1	
@@ -225,7 +321,12 @@ Timer0OVF: ; interrupt subroutine to Timer0
     	cpi r26, low(7812)      ; Check if (r25:r24) = 7812, one second
     	ldi temp, high(7812)    ; 390 = 10^6/128/20 
     	cpc temp, r27
-    	brne notOneSecond			; 1 second hasn't passed
+    	breq OneSecond
+		jmp notOneSecond			; 1 second hasn't passed
+
+		OneSecond:
+		ldi temp, 1
+		sts RefreshFlag, temp
 	
 		clear MicrowaveCounter
 		clr r26
@@ -246,12 +347,7 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		decrementMinutes:
 		lds temp, Minutes
 		cpi temp, 0
-		brge continueCountdown
-
-		finishedCountdown:
-		ldi temp, 0
-		sts Mode, temp
-		rjmp endDecrement
+		breq finishedCountdown
 
 		continueCountdown:
 		dec temp
@@ -261,22 +357,16 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		sts Seconds, temp
 		rjmp endDecrement
 
+		finishedCountdown:
+		ldi temp, 3
+		sts Mode, temp
+		rjmp endDecrement
+
 	endDecrement:
 
     rjmp EndIF
 
 ; supplementary functions
-
-notHundred: 		; Store the new value of the debounce counter.
-	sts DebounceCounter, r26
-	sts DebounceCounter+1, r27
-	rjmp endDebounce
-
-delayDisplay:		; increase the display counter data
-	lds temp, DisplayCounter
-	inc temp
-	sts DisplayCounter, temp
-	rjmp endDisplayData
 
 notOneSecond:
 	sts MicrowaveCounter, r26
@@ -292,6 +382,8 @@ EndIF:
     out SREG, temp
     reti            ; Return from the interrupt.
 
+
+
 main:
 	clear DebounceCounter       ; Initialize the temporary counter to 0
 
@@ -304,9 +396,22 @@ main:
     sei                     ; Enable global interrupt
 
 initKeypadClear:
+	rcall sleep_5ms
 	clr digit
 initKeypad:
-    ldi cmask, INITCOLMASK  ; initial column mask
+	lds temp, DoorState		; if the door is open don't accept any input
+	cpi temp, 1
+	breq initKeypad
+
+    lds temp, RefreshFlag
+	cpi temp, 1
+	brne init_continue
+	ldi temp, 0
+	sts RefreshFlag, temp
+	rcall display_data
+	
+	init_continue:	
+	ldi cmask, INITCOLMASK  ; initial column mask
     clr col                 ; initial column
 	clr temp
 	clr temp1
@@ -375,8 +480,10 @@ convert:
                             ; If the key is not in col 3 and
 	notLetter:
     cpi row, 3              ; if the key is in row 3,
-    breq symbols  			; we have a symbol or 0
+    brne numbers			; we have a symbol or 0
+	jmp symbols
 
+	numbers:
     mov temp1, row          ; otherwise we have a number 1-9
     lsl temp1
     add temp1, row
@@ -384,14 +491,36 @@ convert:
 	subi temp1, -1			; add the value of binary 1
 							; i.e. 0,0 will be 1
 
+	lds temp, Mode
+	cpi temp, 4
+	brne digitDisplay
+
+	PowerLevelSet:
+	cpi temp1, 4
+	brlt PowerLevelCheck0
+	jmp convert_end
+
+	PowerLevelCheck0:
+	cpi temp1, 0
+	brne valid_power_level
+	jmp convert_end
+
+	valid_power_level:
+	sts PowerLevel, temp
+	ldi temp, 0
+	sts Mode, temp
+	rjmp convert_end
+
 ; TODO: do digit entry stuff here
 digitDisplay:
 	lds YL, EnteredDigits
 	inc YL
 	sts EnteredDigits, YL
 	cpi YL, 5
-	brge convert_end
-
+	brlt display
+	jmp convert_end
+	
+	display:
 	shift_left_once DisplayDigits
 	sts DisplayDigits+3, temp1	
 	rjmp convert_end
@@ -403,9 +532,35 @@ letters:
 	breq letterB
 
 letterA:
+	ACheckEntry:
+	lds temp, Mode			; Only add if in running mode
+	cpi temp, 0
+	breq PowerModeSet
+
+	ACheckRunning:
+	cpi temp, 1
+	breq setMore
+	rjmp convert_end
+
+	PowerModeSet:
+	ldi temp, 4
+	sts Mode, temp
+	rjmp convert_end
+
+	setMore:
+	ldi temp, 1
+	sts MoreFlag, temp
 	rjmp convert_end
 
 letterB:
+	lds temp, Mode			; Only add if in running mode
+	cpi temp, 1
+	breq setLess
+	jmp convert_end
+
+	setLess:
+	ldi temp, 1
+	sts LessFlag, temp
 	rjmp convert_end
 
 	rjmp convert_end
@@ -415,9 +570,49 @@ symbols:
     breq star
     cpi col, 1              ; or if we have zero
     breq zero
-    ;ldi temp1, '#'         ; if not we have hash
-	;clr temp1				; TEMP: not handling the hash now
+	cpi col, 2
+	breq hash
     rjmp initKeypad
+
+hash:
+	lds temp, Mode				; if in power level screen, return to entry
+	cpi temp, 4
+	brne hashCheckEntry
+
+	ldi temp, 0
+	sts Mode, temp
+	rjmp convert_end
+
+	hashCheckEntry:
+	lds temp, Mode				; if in entry mode, clear the entered values
+	cpi temp, 0
+	breq hashEntryMode
+
+	hashRunningMode:			; if in running mode, change it to pause mode
+	lds temp, Mode
+	cpi temp, 1
+	breq hashSetPause
+	
+	hashPauseMode:				; if in running mode clear everything and reset
+	clr temp
+	sts Minutes, temp
+	sts Seconds, temp
+	sts Mode, temp
+	rjmp hashEntryMode
+	
+	hashSetPause:
+	ldi temp, 2
+	sts Mode, temp
+	rjmp convert_end 
+
+	hashEntryMode: 				; clear any input
+	clr temp					
+	sts EnteredDigits, temp
+	sts DisplayDigits, temp
+	sts DisplayDigits+1, temp
+	sts DisplayDigits+2, temp
+	sts DisplayDigits+3, temp
+	rjmp convert_end
 
 zero:
 	ldi temp1, 0
@@ -427,16 +622,34 @@ star:
 	lds temp, Mode
 	cpi temp, 0
 	breq startMicrowave
+	rjmp checkAddMinute
 
-	addMinute:
+	checkAddMinute:
+	cpi temp, 4
+	breq star_end				; end, we're in power level screen
+
+	cpi temp, 3					; end we're in finished screen
+	breq star_end
+
 	lds temp, Minutes
 	inc temp
 	sts Minutes, temp
-	rjmp convert_end
+	rjmp star_Set_Entry
 
 	startMicrowave:
+	; check if a time has been entered
+	lds temp, EnteredDigits
+	cpi temp, 0
+	brne digitsEntered
+	
+	noDigitsEntered:
 	ldi temp, 1
-	sts Mode, temp
+	sts Minutes, temp
+	ldi temp, 0
+	sts Seconds, temp
+	rjmp star_Set_Entry
+
+	digitsEntered:
  	lds temp1, DisplayDigits+2
  	ldi temp, 10
  	mul temp, temp1
@@ -450,26 +663,21 @@ star:
   	lds temp1, DisplayDigits+1
   	add temp1, r0
   	sts Minutes, temp1
- 
+
+	star_Set_Entry:
+	ldi temp, 1
+	sts Mode, temp
+	ldi temp, 0
+	sts StopFlag, temp
+	
+	star_end:
  	rjmp convert_end
     
 convert_end:
 	do_lcd_command 0b00000001 ; clear display
-	
+	rcall display_data
 	;rcall display_time
-
-DoorStatus:
-	lds YL, DoorState
-	cpi YL, 0
-	breq DoorOpen
-
-DoorOpen:
-	do_lcd_data 'O'
-	rjmp Finish
-
-DoorClosed:
-	do_lcd_data 'C'
-
+	
 Finish:
 	ldi digit, 1				; use digit as flag - key is pressed but not released yet
     rjmp initKeypad         	; restart the main loop
@@ -562,6 +770,8 @@ dispTwoDigits:
 	rjmp endDisplayDigits
 
 dispOneDigit:
+	ldi temp, 0
+	do_lcd_rdata temp
 	pop temp
 	do_lcd_rdata temp
 	rjmp endDisplayDigits
@@ -642,39 +852,125 @@ display_data:
 	do_lcd_command 0b00000110 ; increment, no display shift
 	do_lcd_command 0b00001110 ; Cursor on, bar, no blink
 
+	lds temp, Mode
+	cpi temp, 3
+	breq display_finished_mode
+	
+	displayOther:
+	lds temp, Mode
+	cpi temp, 4
+	breq PowerLevelScreen
+
 	rcall display_time
 	; TODO: move cursor to the turntable spot
 	;rcall display_turntable
+	rjmp DoorDisplay
+	
+	PowerLevelScreen:
+	do_lcd_data 'S'
+	do_lcd_data 'e'
+	do_lcd_data 't'
+	do_lcd_data ' '
+	do_lcd_data 'P'
+	do_lcd_data 'o'
+	do_lcd_data 'w'
+	do_lcd_data 'e'
+	do_lcd_data 'r'
+	do_lcd_data ' '
+	do_lcd_data '1'
+	do_lcd_data '/'
+	do_lcd_data '2'
+	do_lcd_data '/'
+	do_lcd_data '3'
+	rjmp DoorDisplay		
+
+	display_finished_mode:
+	do_lcd_data 'D'
+	do_lcd_data 'o'
+	do_lcd_data 'n'
+	do_lcd_data 'e'
+
+	do_lcd_command 0b11000000	; break to the next line
+
+	do_lcd_data 'R'
+	do_lcd_data 'e'
+	do_lcd_data 'm'
+	do_lcd_data 'o'
+	do_lcd_data 'v'
+	do_lcd_data 'e'
+	do_lcd_data ' '
+	do_lcd_data 'f'
+	do_lcd_data 'o'
+	do_lcd_data 'o'
+	do_lcd_data 'd'
+	rjmp DoorDisplay
+
+	DoorDisplay:
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+		
+	DoorStatus:
+	lds YL, DoorState
+	cpi YL, 0
+	breq DoorOpen
+
+	DoorOpen:
+	do_lcd_data 'O'
+	rjmp display_end
+
+	DoorClosed:
+	do_lcd_data 'C'
+	rjmp display_end
+
+	display_end:
 	ret
+
 
 display_time:
 	push temp
+	lds temp, Mode
+	cpi temp, 0
+	breq display_input				; if in entry mode display input
+	rjmp display_countdown			; otherwise display current time
+
+display_input:
 	;lds YL, EnteredDigits
 	;do_lcd_digits YL :
+
 	lds YL, DisplayDigits
-	do_lcd_digits YL
+	do_lcd_rdata YL
 	lds YL, DisplayDigits+1
-	do_lcd_digits YL
+	do_lcd_rdata YL
 	do_lcd_data ':'
 	lds YL, DisplayDigits+2
-	do_lcd_digits YL
+	do_lcd_rdata YL
 	lds YL, DisplayDigits+3
-	do_lcd_digits YL
-;	lds YL, Running
-;	do_lcd_digits YL
+	do_lcd_rdata YL
+	rjmp display_Turntable
 
-	do_lcd_data ' '
+display_countdown:
 	lds temp, Minutes
 	do_lcd_digits temp
 	do_lcd_data ':'
 	lds temp, Seconds
 	do_lcd_digits temp
 
-	NextLine:
-	;do_lcd_data ' ';
-	;do_lcd_data ' ';
-	;do_lcd_data ' ';
-	do_lcd_command 0b11000000	; break to the next line
+	rjmp display_Turntable
 
+display_Turntable:
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data ' '
+	do_lcd_data 'T'
+	; display turntable here
 	pop temp
 	ret
