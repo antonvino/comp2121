@@ -12,7 +12,7 @@ initKeypad:
 	cpi temp, 1
 	breq initKeypad
 
-    lds temp, RefreshFlag
+    lds temp, RefreshFlag   ; only display data if the refresh flag is set
 	cpi temp, 1
 	brne init_continue
 	ldi temp, 0
@@ -285,8 +285,8 @@ star:
 	star_Set_Entry:
 	ldi temp, 1
 	sts Mode, temp
-	ldi temp, 0
-	sts StopFlag, temp
+	;ldi temp, 0
+	;sts StopFlag, temp
 
 	lds temp, TurntableDirection	; reverse the turntable rotation
 	ldi temp1, 1

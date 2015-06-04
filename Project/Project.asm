@@ -41,34 +41,34 @@ DisplayCounter:			; Used to call display_data every 100ms
     .byte 1
 DebounceCounter:		; Debounce counter. Used to determine
     .byte 2             ; if 100ms have passed
-MicrowaveCounter:
+MicrowaveCounter:       ; used to count 1 second decrements of time
 	.byte 2
-DisplayDigits:
+DisplayDigits:          ; digits to display (4 bytes)
 	.byte 4
-EnteredDigits:
+EnteredDigits:          ; digits that have been entered
 	.byte 1
 DoorState:				; Door state 0: closed | 1: opened
     .byte 1             
 Mode:					; Current mode 0: Entry | 1: Running | 2: Pause | 3: Finished | 4: Power Level
 	.byte 1
-Minutes:
+Minutes:                ; Minutes in the microwave timer
 	.byte 1
-Seconds:
+Seconds:                ; Seconds in the microwave timer
 	.byte 1
-RefreshFlag:
+RefreshFlag:            ; Flag to check whether to display data on keypress or not
 	.byte 1
-MoreFlag:
+MoreFlag:               ; Flag for addition of 30s
 	.byte 1
-LessFlag:
+LessFlag:               ; Flag for subraction of 30s
 	.byte 1	
-StopFlag:
+;StopFlag:               ; not used
+;	.byte 1
+PowerLevel:             ; Power level for magnetron 0: not set | 1: 100% | 2: 50% | 3: 25% 
 	.byte 1
-PowerLevel:
-	.byte 1
-SecondsIdle:
-	.byte 1
-FadingFlag:
-	.byte 1
+;SecondsIdle:           ; not used
+;	.byte 1
+;FadingFlag:             ; not used
+;	.byte 1
 TurntableCounter:		; counts 2.5s
 	.byte 2
 TurntableState:			; stores the state of turntable 8bit - 8 states
@@ -193,8 +193,8 @@ main:
 	clear_byte RefreshFlag		; Initialize all flags to 0
 	clear_byte MoreFlag
 	clear_byte LessFlag
-	clear_byte StopFlag
-	clear_byte FadingFlag
+	;clear_byte StopFlag
+	;clear_byte FadingFlag
 
     clear_byte DoorState        ; Initialize the door state to closed
 
