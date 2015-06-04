@@ -71,8 +71,8 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		lds temp1, MagnetronOn
 		lds temp2, MagnetronOff
 
-		ldi temp, 0b11111111
-		sts OCR3BL, temp
+		ldi temp, 0
+		sts TCCR3A, temp
 
 		cpi temp1, 0				; if MagnetronOn is 0
 		breq checkMagnetronOff
@@ -84,7 +84,7 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		;out PORTC, temp
 
 		ldi temp, 75
-		sts OCR3BL, temp			; set the speed
+		sts TCCR3A, temp			; set the speed
 
 		checkMagnetronOff:
 		cpi temp2, 0	; if MagnetronOff is 0
@@ -97,7 +97,7 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		breq switchMagnetronOn		; switch it on now
 		; otherwise stop spinning
 		ldi temp, 0
-		sts OCR3BL, temp			; clear the speed
+		sts TCCR3A, temp			; clear the speed
 
 	    lds r24, Timer1Counter ; Load the value of the temporary counter.
     	lds r25, Timer1Counter+1
@@ -242,8 +242,8 @@ main:
 
 	; PWM phase correct 8-bit mode (WGM30)
 	; Clear when up counting, set when down-counting
-	;ldi temp, (1<< WGM30)|(1<<COM3B1)
-	;sts TCCR3A, temp
+	ldi temp, (1<< WGM30)|(1<<COM3B1)
+	sts TCCR3A, temp
 
 	; Timer3 initialisation
 	;ldi temp, 0b00001000
