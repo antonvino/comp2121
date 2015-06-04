@@ -1,3 +1,8 @@
+; LCD functions
+; Authors: UNSW COMP2121 Staff
+; License: MIT
+; 2015
+
 ;
 ; Send a command to the LCD (lcd register)
 ;

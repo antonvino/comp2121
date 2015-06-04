@@ -1,3 +1,10 @@
+; Open-close module for Microwave emulator
+; Includes button subroutines and display functions
+; Authors: Anton Vinokurov
+; Based on COMP2121 Lab and lecture examples
+; License: MIT
+; 2015
+
 ; subroutine for push button 0
 ; close the door
 EXT_INT0:

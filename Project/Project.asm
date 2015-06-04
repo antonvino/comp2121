@@ -7,6 +7,9 @@
 ; UNSW 2015
 .include "m2560def.inc"
 
+;
+; Registers in ascending order
+;
 .def row = r16              ; current row number
 .def col = r17              ; current column number
 .def rmask = r18            ; mask for current row during scan
@@ -26,7 +29,10 @@
 .equ ROWMASK = 0x0F         ; for obtaining input from Port L
 
 .include "modules/macros.asm"
-                        
+
+;
+; The data structures
+;                        
 .dseg
 TempCounter:
     .byte 2             ; Temporary counter. Counts milliseconds
@@ -68,6 +74,14 @@ TurntableState:			; stores the state of turntable 8bit - 8 states
 	.byte 1
 TurntableDirection:		; stores the turntable direction flag 0 CW / 1 CCW
 	.byte 1
+MagnetronTempCounter:	; Temporary counter. Used to determine
+	.byte 2				; if one time inc = 1/4 second has passed                        
+MagnetronCounter:		; Counts how many time incs have passed
+	.byte 1
+MagnetronOn:			; sets for how many time incs it should be on
+	.byte 1
+MagnetronOff:			; sets for how many time incs it should be off
+	.byte 1
 
 ; Interrupts handling
 .cseg
@@ -94,11 +108,11 @@ RESET:
 	sei                     ; enable Global Interrupt
 
 	; keypad setup
-    ldi temp1, PORTLDIR     ; PB7:4/PB3:0, out/in
-    sts DDRL, temp1         ; PORTB is input
-    ser temp1               ; PORTC is output
-    out DDRC, temp1
-    out PORTC, temp1
+    ldi temp1, PORTLDIR     ; PL7:4/PL3:0, out/in
+    sts DDRL, temp1         ; PORTL is input
+    ser temp1               
+    out DDRC, temp1			; Port C is output (LEDs)
+    out DDRB, temp1 		; Port B is output (Motor)
 	
 	; LCD setup
 	ser temp
@@ -143,6 +157,7 @@ RESET:
 	do_lcd_data 'a'
 	do_lcd_data 'r'
 	do_lcd_data 't'
+	do_lcd_data ' '
 	do_lcd_data '('
 	do_lcd_data '*'
 	do_lcd_data ')'
@@ -165,11 +180,32 @@ RESET:
 .include "modules/timer0.asm"
 
 main:
-	clear DebounceCounter       ; Initialize the temporary counter to 0
+	clear DebounceCounter       ; Initialize all counters to 0
+	clear TempCounter       	
+	clear_byte DisplayCounter
+	clear MicrowaveCounter
+	       
+	clear_byte Mode				; Reset all values for microwave
+	clear_byte Minutes
+	clear_byte Seconds
+
+	clear_byte RefreshFlag		; Initialize all flags to 0
+	clear_byte MoreFlag
+	clear_byte LessFlag
+	clear_byte StopFlag
+	clear_byte FadingFlag
+
     clear_byte DoorState        ; Initialize the door state to closed
+
 	clear TurntableCounter	    ; Initialize the turntable counter to 0
-	clear_byte TurntableState
+	clear_byte TurntableState	; init turntable stuff
 	clear_byte TurntableDirection 
+
+	clear_byte PowerLevel		; init the power level to 0 (not set)
+    clear MagnetronTempCounter  ; init the temp magnetron counter to 0
+	clear_byte MagnetronCounter ; init the magnetron
+	clear_byte MagnetronOn
+	clear_byte MagnetronOff
 
 	; Timer 0 init
     ldi temp, 0b00000000

@@ -8,6 +8,8 @@
 Timer0OVF: ; interrupt subroutine to Timer0
     in temp, SREG
     push temp       ; Prologue starts.
+	push temp1
+	push temp2
     push YH         ; Save all conflict registers in the prologue.
     push YL
 	push r27
@@ -31,8 +33,8 @@ Timer0OVF: ; interrupt subroutine to Timer0
     	lds r27, DebounceCounter+1
     	adiw r27:r26, 1 ; Increase the temporary counter by one.
 
-    	cpi r26, low(50)     	; Check if (r25:r24) = 390 ; 7812 = 10^6/128/20 ; 50 milliseconds
-    	ldi temp, high(50)    	; 390 = 10^6/128/20 
+    	cpi r26, low(50)     	; Check if (r25:r24) = 390
+    	ldi temp, high(50)    	; 390
     	cpc temp, r27
     	brne notPBFifty			; 50 milliseconds have not passed
 
@@ -60,14 +62,12 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		rjmp endKeypadDebounce 	; end of Debouncing
 
 	newKeypadDebounce:			; if flag is set continue counting until 100 milliseconds
-		;ldi temp, 0b11000011
-		;out PORTC, temp
 		lds r26, DebounceCounter
     	lds r27, DebounceCounter+1
     	adiw r27:r26, 1 		; Increase the temporary counter by one.
 
-    	cpi r26, low(50)      	; Check if (r25:r24) = 390 ; 7812 = 10^6/128/20 ; 50 milliseconds
-    	ldi temp, high(50)    	; 390 = 10^6/128/20 
+    	cpi r26, low(50)      	; Check if (r25:r24) = 390
+    	ldi temp, high(50)    	; 390
     	cpc temp, r27
     	brne notKeypadFifty		; 50 milliseconds have not passed
 
@@ -92,8 +92,6 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		cpi temp, 1				; We do not turn the table
 		brne endTurntableSpinning
 	
-		out PORTC, temp
-
 		lds r26, TurntableCounter
     	lds r27, TurntableCounter+1
     	adiw r27:r26, 1 		; Increase the turntable counter by one.
@@ -108,12 +106,71 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		clear TurntableCounter	; reset the counter
 
 	endTurntableSpinning:
-		rjmp microwaveRunning	
+		rjmp checkMagnetron	
 
 	notTurning: 				; Store the new value of the turntable counter.
 		sts TurntableCounter, r26
 		sts TurntableCounter+1, r27
 		rjmp endTurntableSpinning
+
+	;
+	; Magnetron timer
+	;
+	checkMagnetron:
+		lds temp, Mode
+		cpi temp, 1
+		brne endMagnetron 		; don't spin until in running mode
+
+		lds temp, PowerLevel
+		cpi temp, 0
+		breq endMagnetron 		; don't spin until the power is set
+
+		lds temp, DoorState
+		cpi temp, 0
+		brne stopMagnetron 		; don't spin if the door is opened
+
+		; if power is set
+		lds temp1, MagnetronOn
+		lds temp2, MagnetronOff
+
+		cpi temp1, 1				; if Magnetron is ON >= 1
+		brge spinMagnetron			; spin it
+		
+		cpi temp2, 0				; if Magnetron is not ON or OFF
+		breq switchMagnetronOn		; set it to on
+									
+									; Magnetron is OFF
+		lds temp, MagnetronCounter
+		cp temp2, temp 				; if MagnetronOff = MagnetronCounter
+		breq switchMagnetronOn		; switch it on now
+									; otherwise stop spinning
+		ldi temp, 0b00000000
+		out PORTB, temp
+
+		countMagnetron:
+
+	    lds r26, MagnetronTempCounter 	; Load the value of the temporary counter.
+    	lds r27, MagnetronTempCounter+1
+    	adiw r27:r26, 1 				; Increase the temporary counter by one.
+
+    	cpi r26, low(1953)      		; 1953 is what we need for 1/4 second
+    	ldi temp, high(1953)
+    	cpc r27, temp
+    	brne notQuarter
+										; 1/4 of a second passed
+										; increase magnetron counter
+		lds temp, MagnetronCounter
+		inc temp
+		sts MagnetronCounter, temp
+		out PORTC, temp
+
+		clear MagnetronTempCounter
+
+	endMagnetron:
+		rjmp microwaveRunning	
+
+	; magnetron timer supplementary branches
+	.include "modules/magnetron.asm"
 
 	;
 	; Microwave running timer
@@ -269,6 +326,8 @@ EndIF:
     pop r27         ; Restore all conflict registers from the stack.
     pop YL
     pop YH
+	pop temp2
+	pop temp1
     pop temp
     out SREG, temp
     reti            ; Return from the interrupt.

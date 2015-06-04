@@ -1,5 +1,5 @@
 ; Keypad processing specific for Microwave emulator
-; Authors: Ali Mokdad, Anton Vinokurov
+; Authors: Ali Mokdad
 ; Based on COMP2121 Lab and lecture examples
 ; License: MIT
 ; UNSW 2015
@@ -25,6 +25,11 @@ initKeypad:
 	clr temp
 	clr temp1
 	clr temp2
+
+	lds temp, DoorState
+	cpi temp, 1
+	breq initKeypad 		; ignore the keypad when the door is opened
+	clr temp
 
 	; debounce check
 	cpi debounceFlag, 1		; if the button is still debouncing, ignore the keypad
@@ -100,22 +105,22 @@ convert:
 	subi temp1, -1			; add the value of binary 1
 							; i.e. 0,0 will be 1
 
-	lds temp, Mode
-	cpi temp, 4
+	lds temp, Mode			; if not in power entry mode
+	cpi temp, 4				; display digits
 	brne digitDisplay
 
-	PowerLevelSet:
-	cpi temp1, 4
+	PowerLevelSet:			; if in power entry mode
+	cpi temp1, 4			; if number is less than 4
 	brlt PowerLevelCheck0
 	jmp convert_end
 
-	PowerLevelCheck0:
+	PowerLevelCheck0:		; check if zero
 	cpi temp1, 0
-	brne valid_power_level
+	brne valid_power_level	; if not it's 1-3
 	jmp convert_end
 
-	valid_power_level:
-	sts PowerLevel, temp
+	valid_power_level:		; now set the power level
+	sts PowerLevel, temp1
 	ldi temp, 0
 	sts Mode, temp
 	rjmp convert_end
@@ -137,18 +142,16 @@ digitDisplay:
 letters:
 	cpi row, 0
 	breq letterA
-	cpi row, 1
-	breq letterB
+	cpi row, 2
+	breq letterC
+	cpi row, 3
+	breq letterD
+	rjmp convert_end
 
 letterA:
-	ACheckEntry:
-	lds temp, Mode			; Only add if in running mode
+	lds temp, Mode			; if entry mode - show power select
 	cpi temp, 0
 	breq PowerModeSet
-
-	ACheckRunning:
-	cpi temp, 1
-	breq setMore
 	rjmp convert_end
 
 	PowerModeSet:
@@ -156,13 +159,19 @@ letterA:
 	sts Mode, temp
 	rjmp convert_end
 
+letterC:
+	lds temp, Mode			; only add if in running mode
+	cpi temp, 1
+	breq setMore
+	rjmp convert_end
+
 	setMore:
 	ldi temp, 1
 	sts MoreFlag, temp
 	rjmp convert_end
 
-letterB:
-	lds temp, Mode			; Only add if in running mode
+letterD:
+	lds temp, Mode			; only subtract if in running mode
 	cpi temp, 1
 	breq setLess
 	jmp convert_end
@@ -172,10 +181,8 @@ letterB:
 	sts LessFlag, temp
 	rjmp convert_end
 
-	rjmp convert_end
-
 symbols:
-    cpi col, 0              ; Check if we have a star
+    cpi col, 0              ; check if we have a star
     breq star
     cpi col, 1              ; or if we have zero
     breq zero
@@ -228,17 +235,19 @@ zero:
 	rjmp digitDisplay
 
 star:
-	lds temp, Mode
+	lds temp, Mode				; in entry mode - start the microwave
 	cpi temp, 0
 	breq startMicrowave
-	rjmp checkAddMinute
+	cpi temp, 2					; in pause mode - restart the microwave
+	breq startMicrowave
+								; otherwise
+	cpi temp, 1					; only add minute if we're in the running mode
+	brne star_end
+	;cpi temp, 4
+	;breq star_end				; end, we're in power level screen
 
-	checkAddMinute:
-	cpi temp, 4
-	breq star_end				; end, we're in power level screen
-
-	cpi temp, 3					; end we're in finished screen
-	breq star_end
+	;cpi temp, 3					; end we're in finished screen
+	;breq star_end
 
 	lds temp, Minutes
 	inc temp
@@ -279,13 +288,12 @@ star:
 	ldi temp, 0
 	sts StopFlag, temp
 
-	lds temp, TurntableDirection	; init the turntable rotation
+	lds temp, TurntableDirection	; reverse the turntable rotation
 	ldi temp1, 1
 	eor temp, temp1
 	sts TurntableDirection, temp
 	rcall turn_table				; start turning
 
-	
 	star_end:
  	rjmp convert_end
     

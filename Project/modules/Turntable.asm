@@ -1,3 +1,9 @@
+; Turntable module for Microwave emulator
+; Authors: Anton Vinokurov
+; Based on COMP2121 Lab and lecture examples
+; License: MIT
+; 2015
+
 turn_table:
 	lds YL, TurntableDirection
 	cpi YL, 1
