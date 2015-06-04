@@ -77,7 +77,7 @@ display_door:
 	ret
 
 display_door_opened:
-	ldi temp, 0b10000000	; light up the top-most LED
+	ldi temp, 0b00000001	; light up the top-most LED
 	out PORTC, temp
 	do_lcd_data 'O'			; show O at the top-right
 	rjmp end_display_door
