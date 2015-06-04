@@ -1,5 +1,5 @@
 ; Macros
-	; Authors: Ali Mokdad, Anton Vinokurov
+; Authors: Ali Mokdad, Anton Vinokurov
 ; Based on COMP2121 Lab and lecture examples
 ; License: MIT
 ; 2015
