@@ -5,6 +5,7 @@
 .def temp = r16
 .def temp1 = r17 
 .def temp2 = r18
+.def MagnetronCount = r19
 
 .include "macros.asm"
                         
@@ -42,8 +43,10 @@ RESET:
     out SPH, temp
     ldi temp, low(RAMEND)
     out SPL, temp
+ 
     ser temp
     out DDRC, temp ; set Port C as output
+    out DDRB, temp ; set Port B as output
 
 	rjmp main
 
@@ -54,50 +57,43 @@ Timer0OVF: ; interrupt subroutine to Timer0
     push temp1      
     push YH         
     push YL
-	push r27
-	push r26
     push r25
     push r24
 	; Prologue ends.
 
 
-	spinMagnetron:
+	checkMagnetron:
 		lds temp, PowerLevel
 		cpi temp, 0
-		breq endSpinMagnetron 		; don't spin until the power is set
+		breq endMagnetron 		; don't spin until the power is set
 
 		; if power is set
 		; spin if MagnetronCounter is less than MagnetronOn
 		lds temp1, MagnetronOn
 		lds temp2, MagnetronOff
 
-		ldi temp, 0
-		sts TCCR3A, temp
+		;ldi temp, 100
+		;sts TCCR3A, temp
 
-		cpi temp1, 0				; if MagnetronOn is 0
-		breq checkMagnetronOff
-		; Magnetron is ON
-		lds temp, MagnetronCounter
-		cp temp1, temp 				; if MagnetronOn = MagnetronCounter
-		breq switchMagnetronOff		; switch it off
-		; otherwise just spin
-		;out PORTC, temp
-
-		ldi temp, 75
-		sts TCCR3A, temp			; set the speed
-
-		checkMagnetronOff:
-		cpi temp2, 0	; if MagnetronOff is 0
-						; this means both flags are 0
-						; and power is set, so switch on
-		breq switchMagnetronOn
-		; Magnetron is OFF
-		lds temp, MagnetronCounter
-		cp temp1, temp 			; if MagnetronOff = MagnetronCounter
+		cpi temp1, 1				; if Magnetron is ON >= 1
+		brge spinMagnetron			; spin it
+		
+		cpi temp2, 0				; if Magnetron is not ON or OFF
+		breq switchMagnetronOn		; set it to on
+									
+									; Magnetron is OFF
+		;lds temp, MagnetronCounter
+		cp temp2, MagnetronCount 				; if MagnetronOff = MagnetronCounter
 		breq switchMagnetronOn		; switch it on now
 		; otherwise stop spinning
-		ldi temp, 0
-		sts TCCR3A, temp			; clear the speed
+		;ldi temp, 0
+		;sts TCCR3A, temp			; clear the speed
+		ldi temp, 0b00000000
+		out PORTB, temp
+
+		countMagnetron:
+		;ldi temp, 0b11111111
+		;out PORTC, temp
 
 	    lds r24, Timer1Counter ; Load the value of the temporary counter.
     	lds r25, Timer1Counter+1
@@ -110,12 +106,15 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		
 		QuarterPassed: 			; 1/4 of a second passed
 								; increase magnetron counter
-		lds temp, MagnetronCounter
-		out PORTC, temp
-		inc temp
-		sts MagnetronCounter, temp
+		;lds temp, MagnetronCounter
+		;out PORTC, MagnetronCount
+		;inc temp
+		;sts MagnetronCounter, temp
+		inc MagnetronCount
 
-	endSpinMagnetron:
+		clear Timer1Counter
+
+	endMagnetron:
  
     rjmp EndIF
 
@@ -124,7 +123,28 @@ NotQuarter: ; Store the new value of the temporary counter.
     sts Timer1Counter+1, r25 
 	rjmp EndIF 
 
+spinMagnetron:
+	lds temp1, MagnetronOn
+	out PORTC, temp1
+	;lds temp, MagnetronCounter
+	cp temp1, MagnetronCount 				; if MagnetronOn = MagnetronCounter
+	breq switchMagnetronOff		; switch it off
+	; otherwise just spin
+	;ldi temp, 100
+	;sts TCCR3A, temp			; set the speed
+	ldi temp, 0b11111111
+	out PORTB, temp
+	rjmp countMagnetron
+
 switchMagnetronOn:
+	;ldi temp, 0b11100111
+	;out PORTC, temp
+
+	;lds temp, MagnetronOn
+	;out PORTC, temp
+	;clear_byte MagnetronCounter
+	clr MagnetronCount
+	clear_byte MagnetronOff
 	lds temp, PowerLevel
 	cpi temp, 1
 	breq switchMagnetronOn1
@@ -132,8 +152,12 @@ switchMagnetronOn:
 	breq switchMagnetronOn2
 	cpi temp, 3
 	breq switchMagnetronOn3
-	rjmp spinMagnetron
+	endSwitchMagnetronOn:
+	rjmp checkMagnetron
 switchMagnetronOff:
+	;clear_byte MagnetronCounter
+	clear_byte MagnetronOn
+	clr MagnetronCount
 	lds temp, PowerLevel
 	cpi temp, 1
 	breq switchMagnetronOff1
@@ -141,64 +165,45 @@ switchMagnetronOff:
 	breq switchMagnetronOff2
 	cpi temp, 3
 	breq switchMagnetronOff3
-	rjmp spinMagnetron
+	endSwitchMagnetronOff:
+	rjmp checkMagnetron
 
 ; MagnetronOn length depending on Power Level
 switchMagnetronOn1:
-	lds temp, MagnetronCounter	; reset magnetron counter
-	clr temp
-	sts MagnetronCounter, temp
 	lds temp, MagnetronOn		
-	ldi temp, 4					; set to spin for 2 time incs
+	ldi temp, 4					; set to spin for 4 time incs
 	sts MagnetronOn, temp
-	rjmp spinMagnetron
+	rjmp endSwitchMagnetronOn
 switchMagnetronOn2:
-	lds temp, MagnetronCounter	; reset magnetron counter
-	clr temp
-	sts MagnetronCounter, temp
 	lds temp, MagnetronOn
 	ldi temp, 2					; set to spin for 2 time incs
 	sts MagnetronOn, temp
-	rjmp spinMagnetron
+	rjmp endSwitchMagnetronOn
 switchMagnetronOn3:
-	lds temp, MagnetronCounter	; reset magnetron counter
-	clr temp
-	sts MagnetronCounter, temp
 	lds temp, MagnetronOn
 	ldi temp, 1					; set to spin for 1 time inc
 	sts MagnetronOn, temp
-	rjmp spinMagnetron
+	rjmp endSwitchMagnetronOn
 ; MagnetronOff length depending on Power Level
 switchMagnetronOff1:
-	lds temp, MagnetronCounter
-	clr temp
-	sts MagnetronCounter, temp
 	lds temp, MagnetronOff
 	ldi temp, 0
 	sts MagnetronOff, temp
-	rjmp spinMagnetron
+	rjmp endSwitchMagnetronOff
 switchMagnetronOff2:
-	lds temp, MagnetronCounter
-	clr temp
-	sts MagnetronCounter, temp
 	lds temp, MagnetronOff
 	ldi temp, 2
 	sts MagnetronOff, temp
-	rjmp spinMagnetron
+	rjmp endSwitchMagnetronOff
 switchMagnetronOff3:
-	lds temp, MagnetronCounter
-	clr temp
-	sts MagnetronCounter, temp
 	lds temp, MagnetronOff
 	ldi temp, 3
 	sts MagnetronOff, temp
-	rjmp spinMagnetron
+	rjmp endSwitchMagnetronOff
     
 EndIF:
 	pop r24         ; Epilogue starts;
     pop r25         ; Restore all conflict registers from the stack.
-	pop r26         
-    pop r27         
     pop YL
     pop YH
 	pop temp1
@@ -213,9 +218,10 @@ main:
 	clear_byte MagnetronCounter ; init the magnetron
 	clear_byte MagnetronOn
 	clear_byte MagnetronOff
+	clr MagnetronCount
 
 	; TEMP set the power level manually
-	ldi temp, 2
+	ldi temp, 3
 	sts PowerLevel, temp
 
 	; Timer0 initilaisation
@@ -236,14 +242,14 @@ main:
 	clr temp
 	sts OCR3BH, temp
 
-	ldi temp, (1 << CS00) ; no prescaling
-	sts TCCR3B, temp
+	;ldi temp, (1 << CS00) ; no prescaling
+	;sts TCCR3B, temp
 
 
 	; PWM phase correct 8-bit mode (WGM30)
 	; Clear when up counting, set when down-counting
-	ldi temp, (1<< WGM30)|(1<<COM3B1)
-	sts TCCR3A, temp
+	;ldi temp, (1<< WGM30)|(1<<COM3B1)
+	;sts TCCR3A, temp
 
 	; Timer3 initialisation
 	;ldi temp, 0b00001000

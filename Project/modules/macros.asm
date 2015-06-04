@@ -11,7 +11,7 @@
 ; The macro clears a byte (1 byte) in a memory
 ; the parameter @0 is the memory address for that byte
 .macro clear_byte
-    ldi YL, high(@0)     		; load the memory address to Y
+    ldi YL, low(@0)    ; load the memory address to Y
     clr temp 
     st Y, temp         ; clear the byte at @0 in SRAM
 .endmacro
