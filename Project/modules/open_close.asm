@@ -12,7 +12,6 @@ EXT_INT0:
 
 	ldi debounceFlag0, 1		; set the debounce flag
 
-	lds temp, DoorState			; set door state to 0
 	ldi temp, 0					
 	sts DoorState, temp
 	rcall display_data			; display that the door is closed
@@ -42,6 +41,10 @@ EXT_INT1:
 	lds temp, DoorState			; set door state to 1
 	ldi temp, 1				
 	sts DoorState, temp
+
+	ldi temp, 2					; set mode to Pause
+	sts Mode, temp
+
 	rcall display_data			; display that the door is opened
 
 	rjmp END_INT1
@@ -51,3 +54,21 @@ END_INT1:
     pop temp
     out SREG, temp
     reti            ; Return from the interrupt.
+
+display_door:
+	push temp
+	lds temp, DoorState
+	cpi temp, 1
+	breq display_door_opened
+	do_lcd_data 'C'			; if closed show C at the top-right
+	ldi temp, 0b00000000	; switch LEDs off
+	out PORTC, temp
+	end_display_door:
+	pop temp
+	ret
+
+display_door_opened:
+	ldi temp, 0b10000000	; light up the top-most LED
+	out PORTC, temp
+	do_lcd_data 'O'			; show O at the top-right
+	rjmp end_display_door

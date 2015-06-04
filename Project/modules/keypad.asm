@@ -278,6 +278,13 @@ star:
 	sts Mode, temp
 	ldi temp, 0
 	sts StopFlag, temp
+
+	lds temp, TurntableDirection	; init the turntable rotation
+	ldi temp1, 1
+	eor temp, temp1
+	sts TurntableDirection, temp
+	rcall turn_table				; start turning
+
 	
 	star_end:
  	rjmp convert_end

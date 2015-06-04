@@ -14,8 +14,10 @@ Timer0OVF: ; interrupt subroutine to Timer0
 	push r26
 	; Prologue ends.
 
+	;
 	; PB debounce for PB0 and PB1
-	; 50ms debounce counter
+	; Using 50ms timer
+	;
 	checkPBDebounce:				; if either flag is set - run the debounce timer
 		cpi debounceFlag0, 1
 		breq newPBDebounce
@@ -47,8 +49,10 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		sts DebounceCounter+1, r27
 		rjmp endPBDebounce
 
+	;
 	; Keypad debounce
-	; 50ms debounce counter
+	; Using 50ms timer
+	;
 	checkKeypadDebounce:		; if flag is set - run the debounce timer
 		cpi debounceFlag, 1
 		breq newKeypadDebounce	; i.e. set to 1
@@ -72,13 +76,48 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		clr r26
 		clr r27	; Reset the debounce counter.
 	endKeypadDebounce:
-		rjmp microwaveRunning	
+		rjmp turntableSpinning	
 
 	notKeypadFifty: 			; Store the new value of the debounce counter.
 		sts DebounceCounter, r26
 		sts DebounceCounter+1, r27
 		rjmp endKeypadDebounce
 
+	;
+	; Turntable spinning timer
+	;
+	turntableSpinning:			; Turntable spins whenever the mode is running
+		
+		lds temp, Mode			; If mode is not "running"
+		cpi temp, 1				; We do not turn the table
+		brne endTurntableSpinning
+	
+		out PORTC, temp
+
+		lds r26, TurntableCounter
+    	lds r27, TurntableCounter+1
+    	adiw r27:r26, 1 		; Increase the turntable counter by one.
+
+    	cpi r26, low(19530)     ; 2.5 seconds 19530
+    	ldi temp, high(19530)
+    	cpc temp, r27
+    	brne notTurning			; 2.5s have not passed
+
+		; 2.5 seconds have passed
+		rcall turn_table		; make the turn
+		clear TurntableCounter	; reset the counter
+
+	endTurntableSpinning:
+		rjmp microwaveRunning	
+
+	notTurning: 				; Store the new value of the turntable counter.
+		sts TurntableCounter, r26
+		sts TurntableCounter+1, r27
+		rjmp endTurntableSpinning
+
+	;
+	; Microwave running timer
+	;
 	microwaveRunning:
 		lds temp, Mode
 		cpi temp, 1

@@ -62,6 +62,12 @@ SecondsIdle:
 	.byte 1
 FadingFlag:
 	.byte 1
+TurntableCounter:		; counts 2.5s
+	.byte 2
+TurntableState:			; stores the state of turntable 8bit - 8 states
+	.byte 1
+TurntableDirection:		; stores the turntable direction flag 0 CW / 1 CCW
+	.byte 1
 
 ; Interrupts handling
 .cseg
@@ -116,6 +122,31 @@ RESET:
 
 	do_lcd_command 0b00000001 ; clear display
 
+	do_lcd_data 'E'
+	do_lcd_data 'n'
+	do_lcd_data 't'
+	do_lcd_data 'e'
+	do_lcd_data 'r'
+	do_lcd_data ' '
+	do_lcd_data 't'
+	do_lcd_data 'i'
+	do_lcd_data 'm'
+	do_lcd_data 'e'
+
+	do_lcd_command 0b11000000	; break to the next line
+
+	do_lcd_data 'O'
+	do_lcd_data 'R'
+	do_lcd_data ' '
+	do_lcd_data 'S'
+	do_lcd_data 't'
+	do_lcd_data 'a'
+	do_lcd_data 'r'
+	do_lcd_data 't'
+	do_lcd_data '('
+	do_lcd_data '*'
+	do_lcd_data ')'
+
   	rjmp main         	; restart the main loop
 
 
@@ -136,6 +167,9 @@ RESET:
 main:
 	clear DebounceCounter       ; Initialize the temporary counter to 0
     clear_byte DoorState        ; Initialize the door state to closed
+	clear TurntableCounter	    ; Initialize the turntable counter to 0
+	clear_byte TurntableState
+	clear_byte TurntableDirection 
 
 	; Timer 0 init
     ldi temp, 0b00000000
@@ -170,10 +204,15 @@ main:
 
 .include "modules/open_close.asm"
 
+.include "modules/turntable.asm"
+
+
 ;
 ; Display the data
 ;
 display_data:
+	push temp
+
 	do_lcd_command 0b00000001 ; clear display
 	do_lcd_command 0b00000110 ; increment, no display shift
 	do_lcd_command 0b00001110 ; Cursor on, bar, no blink
@@ -256,8 +295,8 @@ display_data:
 	rjmp display_end
 			
 	display_end:
+	pop temp
 	ret
-
 
 display_time:
 	push temp
@@ -291,29 +330,6 @@ display_countdown:
 	lds temp, Seconds
 	do_lcd_digits temp
 	rjmp endDisplayTime
-
-display_turntable:
-	do_lcd_data 'T'
-	; display turntable here
-	ret
-
-display_door:
-	push temp
-	lds temp, DoorState
-	cpi temp, 1
-	breq display_door_opened
-	do_lcd_data 'C'			; if closed show C at the top-right
-	ldi temp, 0b00000000	; switch LEDs off
-	out PORTC, temp
-	end_display_door:
-	pop temp
-	ret
-
-display_door_opened:
-	ldi temp, 0b10000000	; light up the top-most LED
-	out PORTC, temp
-	do_lcd_data 'O'			; show O at the top-right
-	rjmp end_display_door
 
 cursor_bottom_right:
 	do_lcd_command 0b11000000	; break to the next line
