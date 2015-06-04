@@ -7,24 +7,26 @@
 ; 2015
 
 notQuarter: 						; Store the new value of the temporary counter.
-	sts MagnetronTempCounter, r24
-	sts MagnetronTempCounter+1, r25 
+	sts MagnetronTempCounter, r26
+	sts MagnetronTempCounter+1, r27 
 	rjmp endMagnetron 
 
 spinMagnetron:
-	lds temp1, MagnetronOn
-	lds temp, MagnetronCounter
-	cp temp1, temp 				; if MagnetronOn = MagnetronCounter
-	breq switchMagnetronOff		; switch it off
-								; otherwise just spin
+	lds temp, MagnetronOn
+	lds timerTemp, MagnetronCounter
+	cp temp, timerTemp 				; if MagnetronOn = MagnetronCounter
+	breq switchMagnetronOff			; switch it off
+									; otherwise just spin
 	ldi temp, 0b11111111
 	out PORTB, temp
 	rjmp countMagnetron
 	
 stopMagnetron:
-	ldi temp, 0b00000000
+	ldi temp, 0b00000000		; stop the motor
 	out PORTB, temp
-	rjmp endMagnetron			
+	ldi temp, 0b00000000		; clear LEDs
+	out PORTC, temp
+	ret			
 	
 ; switching magnetron ON for some time
 ; depending on the power level
@@ -61,16 +63,22 @@ switchMagnetronOn1:
 	lds temp, MagnetronOn		
 	ldi temp, 4					; set to spin for 4 time incs
 	sts MagnetronOn, temp
+	ldi temp, 0b11111111		; output power mode in LEDs
+	out PORTC, temp
 	rjmp endSwitchMagnetronOn
 switchMagnetronOn2:
 	lds temp, MagnetronOn
 	ldi temp, 2					; set to spin for 2 time incs
 	sts MagnetronOn, temp
+	ldi temp, 0b11110000		; output power mode in LEDs
+	out PORTC, temp
 	rjmp endSwitchMagnetronOn
 switchMagnetronOn3:
 	lds temp, MagnetronOn
 	ldi temp, 1					; set to spin for 1 time inc
 	sts MagnetronOn, temp
+	ldi temp, 0b11000000		; output power mode in LEDs
+	out PORTC, temp
 	rjmp endSwitchMagnetronOn
 ; MagnetronOff length depending on Power Level
 switchMagnetronOff1:

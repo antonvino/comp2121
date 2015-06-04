@@ -1,6 +1,14 @@
+		lds temp, Mode
+		cpi temp, 1
+		brne endMagnetron 		; don't spin until in running mode
+
 		lds temp, PowerLevel
 		cpi temp, 0
 		breq endMagnetron 		; don't spin until the power is set
+
+		lds temp, DoorState
+		cpi temp, 0
+		brne stopMagnetron 		; don't spin if the door is opened
 
 		; if power is set
 		lds temp1, MagnetronOn
@@ -26,7 +34,7 @@
     	lds r27, MagnetronTempCounter+1
     	adiw r27:r26, 1 				; Increase the temporary counter by one.
 
-    	cpi r26, low(1953)      		; 1953 is what we need
+    	cpi r26, low(1953)      		; 1953 is what we need for 1/4 second
     	ldi temp, high(1953)
     	cpc r27, temp
     	brne notQuarter
@@ -35,6 +43,7 @@
 		lds temp, MagnetronCounter
 		inc temp
 		sts MagnetronCounter, temp
+		out PORTC, temp
 
 		clear MagnetronTempCounter
 
@@ -43,4 +52,3 @@
 
 	; magnetron timer supplementary branches
 	.include "modules/magnetron.asm"
-

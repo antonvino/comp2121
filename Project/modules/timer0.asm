@@ -29,6 +29,10 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		rjmp endPBDebounce ; go to the end of debounce
 
 	newPBDebounce:				;	if flag is set continue counting until 50 milliseconds
+		clr r26
+		clr r27
+		clr temp
+
 		lds r26, DebounceCounter
     	lds r27, DebounceCounter+1
     	adiw r27:r26, 1 ; Increase the temporary counter by one.
@@ -62,6 +66,10 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		rjmp endKeypadDebounce 	; end of Debouncing
 
 	newKeypadDebounce:			; if flag is set continue counting until 100 milliseconds
+		clr r26
+		clr r27
+		clr temp
+
 		lds r26, DebounceCounter
     	lds r27, DebounceCounter+1
     	adiw r27:r26, 1 		; Increase the temporary counter by one.
@@ -87,6 +95,9 @@ Timer0OVF: ; interrupt subroutine to Timer0
 	; Turntable spinning timer
 	;
 	turntableSpinning:			; Turntable spins whenever the mode is running
+		clr r26
+		clr r27
+		clr temp
 		
 		lds temp, Mode			; If mode is not "running"
 		cpi temp, 1				; We do not turn the table
@@ -117,31 +128,36 @@ Timer0OVF: ; interrupt subroutine to Timer0
 	; Magnetron timer
 	;
 	checkMagnetron:
-		lds temp, Mode
-		cpi temp, 1
-		brne endMagnetron 		; don't spin until in running mode
-
-		lds temp, PowerLevel
-		cpi temp, 0
-		breq endMagnetron 		; don't spin until the power is set
+		clr r26
+		clr r27
+		clr temp
 
 		lds temp, DoorState
 		cpi temp, 0
-		brne stopMagnetron 		; don't spin if the door is opened
+		breq dontStopMagnetron
+		rcall stopMagnetron 		; stop the spinning immediately if door is opened
+		dontStopMagnetron:
 
-		; if power is set
-		lds temp1, MagnetronOn
-		lds temp2, MagnetronOff
+		lds temp, Mode
+		cpi temp, 1
+		brne endMagnetron 			; don't spin until in running mode
 
-		cpi temp1, 1				; if Magnetron is ON >= 1
+		lds temp, PowerLevel
+		cpi temp, 0
+		breq endMagnetron 			; don't spin until the power is set
+		
+		powerSet:					; if power is set
+		lds temp, MagnetronOn
+		cpi temp, 1					; if Magnetron is ON >= 1
 		brge spinMagnetron			; spin it
 		
-		cpi temp2, 0				; if Magnetron is not ON or OFF
+		lds temp, MagnetronOff
+		cpi temp, 0					; if Magnetron is not ON or OFF
 		breq switchMagnetronOn		; set it to on
 									
 									; Magnetron is OFF
-		lds temp, MagnetronCounter
-		cp temp2, temp 				; if MagnetronOff = MagnetronCounter
+		lds timerTemp, MagnetronCounter
+		cp temp, timerTemp 			; if MagnetronOff = MagnetronCounter
 		breq switchMagnetronOn		; switch it on now
 									; otherwise stop spinning
 		ldi temp, 0b00000000
@@ -162,7 +178,6 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		lds temp, MagnetronCounter
 		inc temp
 		sts MagnetronCounter, temp
-		out PORTC, temp
 
 		clear MagnetronTempCounter
 
@@ -172,10 +187,17 @@ Timer0OVF: ; interrupt subroutine to Timer0
 	; magnetron timer supplementary branches
 	.include "modules/magnetron.asm"
 
+
 	;
 	; Microwave running timer
 	;
 	microwaveRunning:
+		clr temp
+		clr temp1
+		clr temp2
+		clr r26
+		clr r27
+
 		lds temp, Mode
 		cpi temp, 1
 		breq runningMode

@@ -49,6 +49,8 @@ EXT_INT1:
 	ldi temp, 1				
 	sts DoorState, temp
 
+	rcall stopMagnetron			; stop the magnetron if it's working
+
 	ldi temp, 2					; set mode to Pause
 	sts Mode, temp
 

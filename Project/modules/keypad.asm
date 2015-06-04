@@ -188,7 +188,7 @@ symbols:
     breq zero
 	cpi col, 2
 	breq hash
-    rjmp initKeypad
+    rjmp convert_end
 
 hash:
 	lds temp, Mode				; if in power level screen, return to entry
@@ -217,8 +217,9 @@ hash:
 	rjmp hashEntryMode
 	
 	hashSetPause:
-	ldi temp, 2
-	sts Mode, temp
+	rcall stopMagnetron			; stop the magnetron is it's working
+	ldi temp, 2					
+	sts Mode, temp				; set mode to Pause
 	rjmp convert_end 
 
 	hashEntryMode: 				; clear any input

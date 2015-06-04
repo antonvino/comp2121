@@ -20,6 +20,7 @@
 .def lcd = r23
 .def debounceFlag0 = r24	; button 1 debounce
 .def debounceFlag1 = r25	; button 2 debounce
+.def timerTemp = r26
 .def digit = r27			; used to display decimal numbers digit by digit
 .def debounceFlag = r30		; the debounce flag
 .def digitCount = r31		; how many digits do we have to display?
