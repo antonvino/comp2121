@@ -1,54 +1,52 @@
-		lds temp, Mode
-		cpi temp, 1
-		brne endMagnetron 		; don't spin until in running mode
+Timer3OVF: ; interrupt subroutine to Timer0
+    in temp, SREG
+    push temp       ; Prologue starts.
+    push YH         ; Save all conflict registers in the prologue.
+    push YL
+    push r27
+    push r26
+	; Prologue ends.      
 
-		lds temp, PowerLevel
-		cpi temp, 0
-		breq endMagnetron 		; don't spin until the power is set
+	lds timerTemp, SecondsIdle		; only dim if 10 seconds idle
+	cpi timerTemp, 10
+	brne endBacklightDim
 
-		lds temp, DoorState
-		cpi temp, 0
-		brne stopMagnetron 		; don't spin if the door is opened
+	backlightDim:
+	    lds r26, BacklightCounter
+    	lds r27, TempCounter+1
+    	adiw r27:r26, 1 		; Increase the temporary counter by one.
 
-		; if power is set
-		lds temp1, MagnetronOn
-		lds temp2, MagnetronOff
-
-		cpi temp1, 1				; if Magnetron is ON >= 1
-		brge spinMagnetron			; spin it
+    	cpi r26, low(3906)		; 500ms have passed?
+    	ldi timerTemp, high(3906)
+    	cpc r27, timerTemp
+    	brne Not500ms
 		
-		cpi temp2, 0				; if Magnetron is not ON or OFF
-		breq switchMagnetronOn		; set it to on
-									
-									; Magnetron is OFF
-		lds temp, MagnetronCounter
-		cp temp2, temp 				; if MagnetronOff = MagnetronCounter
-		breq switchMagnetronOn		; switch it on now
-									; otherwise stop spinning
-		ldi temp, 0b00000000
-		out PORTB, temp
+		lds timerTemp, high(Backlight)
+		lds temp, low(Backlight)
+		sts OCR3BL, timerTemp	; write the value
 
-		countMagnetron:
+		ror timerTemp			; shift the pattern
+		ror temp
 
-	    lds r26, MagnetronTempCounter 	; Load the value of the temporary counter.
-    	lds r27, MagnetronTempCounter+1
-    	adiw r27:r26, 1 				; Increase the temporary counter by one.
+		sts Backlight, temp		; store the backlight value
+		sts Backlight+1, timerTemp
 
-    	cpi r26, low(1953)      		; 1953 is what we need for 1/4 second
-    	ldi temp, high(1953)
-    	cpc r27, temp
-    	brne notQuarter
-										; 1/4 of a second passed
-										; increase magnetron counter
-		lds temp, MagnetronCounter
-		inc temp
-		sts MagnetronCounter, temp
-		out PORTC, temp
+	    clear BacklightCounter       ; Reset the temporary counter.
+                            
+	endBacklightDim:
 
-		clear MagnetronTempCounter
+    rjmp EndTimer3
 
-	endMagnetron:
-		rjmp microwaveRunning	
-
-	; magnetron timer supplementary branches
-	.include "modules/magnetron.asm"
+Not500ms: ; Store the new value of the temporary counter.
+    sts BacklightCounter, r26
+    sts BacklightCounter+1, r27
+	rjmp EndTimer3
+    
+EndTimer3:
+    pop r26         ; Epilogue starts;
+    pop r27         ; Restore all conflict registers from the stack.
+    pop YL
+    pop YH
+    pop temp
+    out SREG, temp
+    reti            ; Return from the interrupt.

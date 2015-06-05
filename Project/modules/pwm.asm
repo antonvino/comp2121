@@ -1,13 +1,25 @@
 .include "m2560def.inc"
 .def temp=r16
-ldi temp, 0b00001000
-sts DDRL, temp ; Bit 3 will function as OC5A.
-ldi temp, 0x4A ; the value controls the PWM duty cycle
-sts OCR5AL, temp
-clr temp
-sts OCR5AH, temp
-; Set the Timer5 to Phase Correct PWM mode.
-ldi temp, (1 << CS50)
-sts TCCR5B, temp
-ldi temp, (1<< WGM50)|(1<<COM5A1)
-sts TCCR5A, temp
+	; PWM Configuration
+
+	; Configure bit PE2 as output
+	ldi temp, 0b00010000
+	ser temp
+	out DDRE, temp ; Bit 3 will function as OC3B
+	ldi temp, 0xFF ; the value controls the PWM duty cycle (store the value in the OCR registers)
+	sts OCR3BL, temp
+	clr temp
+	sts OCR3BH, temp
+
+	ldi temp, (1 << CS30) ; no prescaling
+	sts TCCR3B, temp
+
+
+	; PWM phase correct 8-bit mode (WGM30)
+	; Clear when up counting, set when down-counting
+	ldi temp, (1<< WGM30)|(1<<COM3B1)
+	sts TCCR3A, temp
+
+	sei
+loop:
+rjmp loop

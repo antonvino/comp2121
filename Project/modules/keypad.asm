@@ -249,6 +249,7 @@ star:
 	;cpi temp, 3					; end we're in finished screen
 	;breq star_end
 
+	out PORTC, temp
 	lds temp, Minutes
 	inc temp
 	sts Minutes, temp
@@ -298,6 +299,9 @@ star:
  	rjmp convert_end
     
 convert_end:
+	clr temp					; clear seconds idle
+	sts SecondsIdle, temp
+
 	do_lcd_command 0b00000001 ; clear display
 	rcall display_data
 	;rcall display_time

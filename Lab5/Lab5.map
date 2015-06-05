@@ -1,5 +1,5 @@
 
-AVRASM ver. 2.1.42  C:\Users\Ali\.ssh\COMP2121\comp2121\Lab5\TimerExample.asm Wed May 27 16:50:25 2015
+AVRASM ver. 2.1.42  C:\Users\mrbladers\Documents\COMP2121\comp2121\Lab5\Lab05B.asm Fri Jun 05 09:41:38 2015
 
 
 EQU  SIGNATURE_000 0000001e
@@ -1365,14 +1365,14 @@ DEF  BrightnessH  r18
 DEF  BrightnessL  r17
 DSEG SecondCounter 00000200
 DSEG TempCounter  00000202
-CSEG RESET        00000033
-CSEG DEFAULT      00000032
-CSEG Timer0OVF    0000003a
-CSEG main         0000007c
-CSEG newSecond    00000042
-CSEG NotSecond    0000006f
-CSEG showPattern  0000004b
-CSEG reloadPattern 00000064
-CSEG EndIF        00000073
-CSEG setCarry     0000006c
-CSEG loop         000000a1
+CSEG RESET        0000004b
+CSEG DEFAULT      0000004a
+CSEG Timer3OVF    00000052
+CSEG main         00000093
+CSEG newSecond    0000005a
+CSEG NotSecond    00000086
+CSEG showPattern  00000063
+CSEG reloadPattern 0000007b
+CSEG EndIF        0000008a
+CSEG setCarry     00000083
+CSEG loop         000000c3

@@ -33,6 +33,7 @@
 .equ LCD_E = 6
 .equ LCD_RW = 5
 .equ LCD_BE = 4
+.equ MAXBRIGHTNESS = 0b1111111111111111	; pattern defined for backlight brightness
 
 .include "modules/macros.asm"
 
@@ -88,6 +89,12 @@ MagnetronOn:			; sets for how many time incs it should be on
 	.byte 1
 MagnetronOff:			; sets for how many time incs it should be off
 	.byte 1
+Backlight:
+	.byte 2				; brightness of the backlight
+SecondsIdle:
+	.byte 1				; how many seconds no keys have been pressed
+BacklightCounter:		; backlight ms counter
+	.byte 2
 
 ; Interrupts handling
 .cseg
@@ -97,12 +104,15 @@ MagnetronOff:			; sets for how many time incs it should be off
     jmp EXT_INT0
 .org INT1addr
 	jmp EXT_INT1
-    jmp DEFAULT          ; No handling for IRQ0.
-    jmp DEFAULT          ; No handling for IRQ1.
+    jmp DEFAULT        	; No handling for IRQ0.
+    jmp DEFAULT        	; No handling for IRQ1.
 .org OVF0addr
-    jmp Timer0OVF        ; Jump to the interrupt handler for
-                        ; Timer0 overflow.
-	jmp DEFAULT          ; default service for all other interrupts.
+    jmp Timer0OVF      	; Jump to the interrupt handler for
+						; Timer0 overflow.
+;.org OVF3addr
+;	jmp Timer3OVF       ; Jump to the interrupt handler for
+                      	; Timer3 overflow.	
+	jmp DEFAULT         ; default service for all other interrupts.
 DEFAULT:  reti          ; no service
 
 RESET:
@@ -172,6 +182,8 @@ RESET:
 
 .include "modules/timer0.asm"
 
+.include "modules/backlight.asm"
+
 main:
 	clear DebounceCounter       ; Initialize all counters to 0
 	clear TempCounter       	
@@ -200,6 +212,8 @@ main:
 	clear_byte MagnetronOn
 	clear_byte MagnetronOff
 
+	clear BacklightCounter
+
 	; Timer 0 init
     ldi temp, 0b00000000
     out TCCR0A, temp
@@ -223,7 +237,36 @@ main:
     ori temp, (1<<INT1)
     out EIMSK, temp
 
+	; Timer3 initialisation
+	;ldi temp, (1<<CS50)
+	;sts TCCR3B, temp
+	;ldi temp, (1<<WGM30)|(1<<COM3A1)
+	;sts TCCR3A, temp
+	;ldi temp, 1<<TOIE3	
+    ;sts TIMSK3, temp        ; T/C3 interrupt enable
+   	
+	; PWM Configuration
+
+	; Configure bit PE2 as output
+	;ldi temp, 0b00010000
+	;ser temp
+	;out DDRE, temp ; Bit 3 will function as OC3B
+	;ldi temp, 0xFF ; the value controls the PWM duty cycle (store the value in the OCR registers)
+	;sts OCR3BL, temp
+	;clr temp
+	;sts OCR3BH, temp
+
+	;ldi temp, (1 << CS00) ; no prescaling
+	;sts TCCR3B, temp
+
+	; PWM phase correct 8-bit mode (WGM30)
+	; Clear when up counting, set when down-counting
+	;ldi temp, (1<< WGM30)|(1<<COM3B1)
+	;sts TCCR3A, temp
+
     sei                     ; Enable global interrupt
+
+	rcall backlight_on
 
 .include "modules/keypad.asm"
 

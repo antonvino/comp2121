@@ -185,7 +185,6 @@ Timer0OVF: ; interrupt subroutine to Timer0
 	; magnetron timer supplementary branches
 	.include "modules/magnetron.asm"
 
-
 	;
 	; Microwave running timer
 	;
@@ -294,6 +293,11 @@ Timer0OVF: ; interrupt subroutine to Timer0
 		jmp notOneSecond			; 1 second hasn't passed
 
 		OneSecond:
+
+		lds temp, SecondsIdle		; increase seconds idle every second
+		inc temp
+		sts SecondsIdle, temp
+
 		ldi temp, 1
 		sts RefreshFlag, temp
 	
