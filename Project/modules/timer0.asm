@@ -223,14 +223,30 @@ Timer0OVF: ; interrupt subroutine to Timer0
 
 		CarryMore:
 			lds temp, Minutes
+			cpi temp, 99
+			breq ReachedMax
+
 			inc temp
 			sts Minutes, temp
 			lds temp, Seconds
 			ldi temp1, 30
 			sub temp, temp1
 			sts Seconds, temp
-			do_lcd_data '-'
-			do_lcd_digits temp
+			rjmp EndMore
+
+			ReachedMax:
+			lds temp, Seconds
+			cpi temp, 69
+			brlt NotMax
+
+			ldi temp, 99
+			sts Seconds, emp
+			rjmp EndMore
+	
+			NotMax:
+			ldi temp1, 30
+			add temp, temp1
+			sts Seconds, temp
 			rjmp EndMore
 
 		NoCarryMore:
