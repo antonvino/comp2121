@@ -1,4 +1,4 @@
-; Magnetron module for Microwave emulator
+ ; Magnetron module for Microwave emulator
 ; Includes only the Timer0 subroutines
 ; To be used only inside of Timer0 (see timer0.asm)
 ; Authors: Anton Vinokurov
