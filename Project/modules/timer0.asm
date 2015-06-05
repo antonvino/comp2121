@@ -239,7 +239,7 @@ Timer0OVF: ; interrupt subroutine to Timer0
 			brlt NotMax
 
 			ldi temp, 99
-			sts Seconds, emp
+			sts Seconds, temp
 			rjmp EndMore
 	
 			NotMax:

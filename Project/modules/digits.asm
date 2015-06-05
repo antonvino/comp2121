@@ -7,9 +7,9 @@
 ; function: displaying given number by digit in ASCII using stack
 convert_digits:
 	push digit
-	;push temp
-	;push temp1
-	;push temp2
+	push temp
+	push temp1
+	push temp2
 	checkHundreds:
 		cpi temp, 100			; is the number still > 100?
 		brsh hundredsDigit		; if YES - increase hundreds digit
@@ -46,9 +46,9 @@ convert_digits:
 	breq dispOneDigit
 
 	endDisplayDigits:
-	;pop temp2
-	;pop temp1
-	;pop temp
+	pop temp2
+	pop temp1
+	pop temp
 	pop digit
 	ret
 
